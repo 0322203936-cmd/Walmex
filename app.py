@@ -60,6 +60,8 @@ def cargar_datos(url: str = "") -> dict:
     idx_ventas   = col('Cnt POS')       # Unidades vendidas (Cnt POS)
     idx_embarque = col('Cntd Embarque') # Unidades embarcadas
     idx_merma_vc = col('Cant VC Tienda') # Merma (Cant VC Tienda)
+    idx_venta_cfbc = col('Venta CFBC / Costo (Facturado)') # Venta CFBC para Tienda
+    idx_retail_vc = col('Suma de Retail VC Tienda') # Retail VC Tienda
 
     records = []
     for row in ws.iter_rows(min_row=2, values_only=True):
@@ -105,6 +107,8 @@ def cargar_datos(url: str = "") -> dict:
             'ventas_u':   sv(row[idx_ventas]),
             'embarque_u': sv(row[idx_embarque]),
             'merma_u':    sv(row[idx_merma_vc]),  # Tomar directamente de Cant VC Tienda
+            'venta_cfbc': sv(row[idx_venta_cfbc]),  # Venta CFBC
+            'retail_vc':  sv(row[idx_retail_vc]),   # Retail VC Tienda
         })
 
     semanas   = sorted(set(r['semana'] for r in records))
@@ -116,6 +120,8 @@ def cargar_datos(url: str = "") -> dict:
         by_stp[r['semana']][r['tienda']][r['producto']]['ventas_u']   += r['ventas_u']
         by_stp[r['semana']][r['tienda']][r['producto']]['embarque_u'] += r['embarque_u']
         by_stp[r['semana']][r['tienda']][r['producto']]['merma_u']    += r['merma_u']
+        by_stp[r['semana']][r['tienda']][r['producto']]['venta_cfbc'] += r['venta_cfbc']
+        by_stp[r['semana']][r['tienda']][r['producto']]['retail_vc']  += r['retail_vc']
 
     # Fecha real del Excel por semana
     fecha_por_semana = {}
@@ -136,6 +142,8 @@ def cargar_datos(url: str = "") -> dict:
                 v3   = sum(by_stp[sem][t][p]['ventas_u']   for sem in last3)
                 emb3 = sum(by_stp[sem][t][p]['embarque_u'] for sem in last3)  # embarque 3 semanas
                 m3   = sum(by_stp[sem][t][p]['merma_u']    for sem in last3)  # merma 3 semanas (Cant VC Tienda)
+                cfbc3 = sum(by_stp[sem][t][p]['venta_cfbc'] for sem in last3)  # Venta CFBC 3 semanas
+                retail3 = sum(by_stp[sem][t][p]['retail_vc'] for sem in last3)  # Retail VC 3 semanas
                 avg  = v3 / len(last3) if last3 else 0  # Promedio = 3 semanas / 3
                 
                 # Proyección = Venta Promedio / (1 - Índice Merma %)
@@ -147,6 +155,7 @@ def cargar_datos(url: str = "") -> dict:
                     'emb': round(emb3), 'm3': round(m3),
                     'avg': round(avg, 1), 'proj': round(proj),
                     'pct_merma': round(m3/emb3*100) if emb3 > 0 else 0,
+                    'cfbc': round(cfbc3), 'retail': round(retail3),
                 }
             result[t][s] = prod_data
 
@@ -404,37 +413,37 @@ function renderTienda(){
   var key = String(state.semana);
   var tiendas = DATA.tiendas;
   var prods = DATA.productos;
-  var totV12=0,totV3=0,totEmb=0,totM3=0,totAvg=0,totProj=0,totEmb2=0;
+  var totEmb=0,totCfbc=0,totMerma=0,totRetail=0,totAvg=0,totProj=0;
   var tiendaData = [];
   
   // Primer pass: calcular totales por tienda
   tiendas.forEach(function(tienda){
-    var v12t=0,v3t=0,emb3t=0,m3t=0,avg3t=0,proj3t=0,emb2t=0;
+    var embt=0,cfbct=0,mermat=0,retailt=0,v3t=0,avg3t=0,proj3t=0;
     prods.forEach(function(p){
-      var d = (DATA.data[tienda]&&DATA.data[tienda][key]&&DATA.data[tienda][key][p]) || {v12:0,v3:0,emb:0,m3:0,avg:0,proj:0};
-      v12t+=d.v12; v3t+=d.v3; emb3t+=d.emb; m3t+=d.m3; avg3t+=d.avg; proj3t+=d.proj; emb2t+=d.emb;
+      var d = (DATA.data[tienda]&&DATA.data[tienda][key]&&DATA.data[tienda][key][p]) || {emb:0,cfbc:0,m3:0,retail:0,v3:0,avg:0,proj:0};
+      embt+=d.emb; cfbct+=d.cfbc; mermat+=d.m3; retailt+=d.retail; v3t+=d.v3; avg3t+=d.avg; proj3t+=d.proj;
     });
-    totV12+=v12t; totV3+=v3t; totEmb+=emb3t; totM3+=m3t; totAvg+=avg3t; totProj+=proj3t; totEmb2+=emb2t;
-    tiendaData.push({tienda:tienda, v12:v12t, v3:v3t, emb:emb3t, m3:m3t, avg:avg3t, proj:proj3t, emb2:emb2t});
+    totEmb+=embt; totCfbc+=cfbct; totMerma+=mermat; totRetail+=retailt; totAvg+=avg3t; totProj+=proj3t;
+    tiendaData.push({tienda:tienda, emb:embt, cfbc:cfbct, merma:mermat, retail:retailt, v3:v3t, avg:avg3t, proj:proj3t});
   });
   
-  // Segundo pass: generar filas con porcentajes correctos
+  // Segundo pass: generar filas
   var histRows='',mermaRows='',avgRows='',projRows='';
   tiendaData.forEach(function(t){
-    var pct_venta = totV12 > 0 ? Math.round(t.v12/totV12*100) : 0;
-    var pct_merma_t = t.emb > 0 ? Math.round(t.m3/t.emb*100) : 0;
+    var pct_venta = totCfbc > 0 ? Math.round(t.cfbc/totCfbc*100) : 0;
+    var pct_retail = t.emb > 0 ? Math.round(t.retail/t.emb*100) : 0;
     var avg_semanal = t.v3 / 3;
     
-    histRows  += '<tr><td>'+t.tienda+'</td><td>'+fmt(t.v12)+'</td><td>$ '+fmt(t.v12)+'</td><td>'+pct_venta+'%</td></tr>';
-    mermaRows += '<tr><td>'+t.tienda+'</td><td>'+fmt(t.emb)+'</td><td>$</td><td class="'+(t.m3>0?'red':'')+'">'+fmt(t.m3)+'</td><td class="'+(pct_merma_t>0?'red':'')+'">'+pct_merma_t+'%</td></tr>';
+    histRows  += '<tr><td>'+t.tienda+'</td><td>'+fmt(t.emb)+'</td><td>$ '+fmt(t.cfbc)+'</td><td>'+pct_venta+'%</td></tr>';
+    mermaRows += '<tr><td>'+t.tienda+'</td><td>'+fmt(t.merma)+'</td><td>$</td><td class="'+(t.retail>0?'red':'')+'">'+fmt(t.retail)+'</td><td class="'+(pct_retail>0?'red':'')+'">'+pct_retail+'%</td></tr>';
     avgRows   += '<tr><td>'+t.tienda+'</td><td>'+Math.round(avg_semanal)+'</td></tr>';
     projRows  += '<tr><td>'+t.tienda+'</td><td class="bold">'+fmt(t.proj)+'</td></tr>';
   });
   
-  histRows  += '<tr class="total"><td>Total</td><td>'+fmt(totV12)+'</td><td>$ '+fmt(totV12)+'</td><td>100%</td></tr>';
-  var pct_merma_total = totEmb2 > 0 ? Math.round(totM3/totEmb2*100) : 0;
-  mermaRows += '<tr class="total"><td>Total</td><td>'+fmt(totEmb)+'</td><td>$</td><td class="red">'+fmt(totM3)+'</td><td class="red">'+pct_merma_total+'%</td></tr>';
-  var avg_total = totV3 / 3;
+  histRows  += '<tr class="total"><td>Total</td><td>'+fmt(totEmb)+'</td><td>$ '+fmt(totCfbc)+'</td><td>100%</td></tr>';
+  var pct_retail_total = totEmb > 0 ? Math.round(totRetail/totEmb*100) : 0;
+  mermaRows += '<tr class="total"><td>Total</td><td>'+fmt(totMerma)+'</td><td>$</td><td class="red">'+fmt(totRetail)+'</td><td class="red">'+pct_retail_total+'%</td></tr>';
+  var avg_total = totAvg / tiendas.length;
   avgRows   += '<tr class="total"><td>Total</td><td>'+Math.round(avg_total)+'</td></tr>';
   projRows  += '<tr class="total"><td>Total</td><td>'+fmt(totProj)+'</td></tr>';
   
