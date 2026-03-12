@@ -33,7 +33,7 @@ iframe { display: block !important; margin: 0 !important; border: none !importan
 </style>
 """, unsafe_allow_html=True)
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600, show_spinner=False)
 def cargar_datos(path: str) -> dict:
     wb = openpyxl.load_workbook(path, data_only=True)
     ws = wb['Data']
@@ -318,7 +318,11 @@ function imprimirReporte(){
     'tr.total td{font-weight:700;border-top:1px solid #ddd;background:#f5f5f5}',
     '.red{color:#c00;font-weight:600}.bold{font-weight:700}',
     '@page{margin:10mm}',
-    '@media print{body{padding:0}}'
+    '@media print{body{padding:0}.aviso{display:none!important}}',
+    '.aviso{background:#fffbe6;border:1px solid #f0b429;border-radius:6px;',
+           'padding:8px 14px;margin-bottom:12px;font-size:.75rem;color:#7a5c00;',
+           'display:flex;align-items:center;gap:8px}',
+    '.aviso b{font-size:.8rem}'
   ].join('');
 
   var html = '<!DOCTYPE html><html lang="es"><head>'
@@ -326,6 +330,8 @@ function imprimirReporte(){
     + '<title>Walmart CFBC \u00b7 Sem '+semana+' \u00b7 '+tienda+'</title>'
     + '<style>'+css+'</style>'
     + '</head><body>'
+    + '<div class="aviso">⚠️ &nbsp;<span>Antes de imprimir, en <b>Más opciones</b> desactiva '
+    +   '<b>"Encabezados y pies de página"</b> para un reporte limpio.</span></div>'
     + '<div class="hdr">'
     +   '<div class="logo">'
     +     '<span class="wm-text">Walmart</span>'
