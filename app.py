@@ -9,7 +9,14 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Walmex · CFBC", layout="wide", initial_sidebar_state="collapsed")
-st.markdown("<style>header,footer,[data-testid='stToolbar']{display:none!important}section[data-testid='stSidebar']{display:none!important}.main .block-container{padding:0!important;max-width:100%!important}</style>", unsafe_allow_html=True)
+st.markdown("""<style>
+header,footer,[data-testid='stToolbar'],[data-testid='stDecoration']{display:none!important}
+section[data-testid='stSidebar']{display:none!important}
+.main .block-container{padding:0!important;max-width:100%!important}
+.main{padding:0!important}
+#root > div:first-child{padding:0!important}
+iframe{display:block}
+</style>""", unsafe_allow_html=True)
 
 @st.cache_data(ttl=3600)
 def cargar_datos(path: str) -> dict:
@@ -88,33 +95,33 @@ HTML = r"""<!DOCTYPE html>
 body{background:#fff;font-family:Arial,sans-serif;font-size:12px;color:#111}
 
 /* ── HEADER ── */
-.hdr{display:flex;align-items:flex-start;justify-content:space-between;padding:10px 18px 6px;border-bottom:1px solid #ccc}
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:6px 16px 4px;border-bottom:1px solid #ccc}
 .wm-logo{display:flex;align-items:center;gap:4px}
-.wm-text{font-size:1.35rem;font-weight:700;color:#0071ce;letter-spacing:-0.5px}
-.wm-spark{color:#ffc220;font-size:1.5rem;line-height:1}
-.hdr-right{text-align:right;font-size:.75rem;color:#333;line-height:1.7}
-.hdr-tienda{padding:4px 18px 8px;font-size:.82rem;color:#333;border-bottom:1px solid #ddd}
-.hdr-tienda strong{font-size:.84rem}
+.wm-text{font-size:1.2rem;font-weight:700;color:#0071ce;letter-spacing:-0.5px}
+.wm-spark{color:#ffc220;font-size:1.3rem;line-height:1}
+.hdr-right{text-align:right;font-size:.72rem;color:#333;line-height:1.6}
+.hdr-tienda{padding:3px 16px 4px;font-size:.78rem;color:#333;border-bottom:1px solid #ddd}
+.hdr-tienda strong{font-size:.8rem}
 
 /* ── CONTROLS ── */
-.ctrl{display:flex;align-items:center;gap:10px;padding:7px 18px;background:#f5f7fa;border-bottom:1px solid #ddd;flex-wrap:wrap}
-.ctrl label{font-size:.72rem;color:#555;font-weight:600}
-select{border:1px solid #bbb;border-radius:4px;padding:4px 8px;font-size:.75rem;cursor:pointer;background:#fff}
-.chip-wrap{display:flex;flex-wrap:wrap;gap:5px;flex:1}
-.chip{padding:3px 10px;border-radius:12px;font-size:.7rem;cursor:pointer;border:1px solid #bbb;color:#333;background:#fff;transition:.15s}
+.ctrl{display:flex;align-items:center;gap:8px;padding:5px 16px;background:#f5f7fa;border-bottom:1px solid #ddd;flex-wrap:wrap}
+.ctrl label{font-size:.7rem;color:#555;font-weight:600}
+select{border:1px solid #bbb;border-radius:4px;padding:3px 7px;font-size:.72rem;cursor:pointer;background:#fff}
+.chip-wrap{display:flex;flex-wrap:wrap;gap:4px;flex:1}
+.chip{padding:2px 9px;border-radius:12px;font-size:.67rem;cursor:pointer;border:1px solid #bbb;color:#333;background:#fff;transition:.15s}
 .chip:hover{border-color:#0071ce;color:#0071ce}
 .chip.on{background:#0071ce;color:#fff;border-color:#0071ce}
 
 /* ── 4 TABLE GRID ── */
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:0;padding:12px 18px;gap:12px}
+.grid{display:grid;grid-template-columns:1fr 1fr;padding:8px 16px;gap:8px}
 
 .box{border:1px solid #bbb;border-radius:4px;overflow:hidden}
-.box-hdr{background:#f0f0f0;border-bottom:1px solid #bbb;padding:6px 10px;text-align:center;font-size:.78rem;font-weight:700;color:#111}
+.box-hdr{background:#f0f0f0;border-bottom:1px solid #bbb;padding:4px 10px;text-align:center;font-size:.74rem;font-weight:700;color:#111}
 
 table.t{width:100%;border-collapse:collapse}
-table.t th{padding:5px 10px;font-size:.7rem;font-weight:700;color:#333;border-bottom:1px solid #ccc;text-align:right;white-space:nowrap;background:#fafafa}
+table.t th{padding:3px 10px;font-size:.67rem;font-weight:700;color:#333;border-bottom:1px solid #ccc;text-align:right;white-space:nowrap;background:#fafafa}
 table.t th:first-child{text-align:left}
-table.t td{padding:4px 10px;font-size:.75rem;border-bottom:1px solid #eee;text-align:right;color:#222;white-space:nowrap}
+table.t td{padding:2px 10px;font-size:.72rem;border-bottom:1px solid #eee;text-align:right;color:#222;white-space:nowrap}
 table.t td:first-child{text-align:left;color:#111}
 table.t tr.total td{font-weight:700;border-top:1.5px solid #bbb;background:#f5f5f5}
 table.t tr:hover:not(.total) td{background:#f0f7ff}
@@ -295,4 +302,4 @@ def build_html():
     ).decode('ascii')
     return HTML.replace('__DATA_JSON__', data_json)
 
-components.html(build_html(), height=820, scrolling=False)
+components.html(build_html(), height=980, scrolling=False)
