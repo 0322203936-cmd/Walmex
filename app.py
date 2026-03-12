@@ -136,7 +136,7 @@ def cargar_datos(url: str = "") -> dict:
                 v3   = sum(by_stp[sem][t][p]['ventas_u']   for sem in last3)
                 emb3 = sum(by_stp[sem][t][p]['embarque_u'] for sem in last3)  # embarque 3 semanas
                 m3   = sum(by_stp[sem][t][p]['merma_u']    for sem in last3)  # merma 3 semanas (Cant VC Tienda)
-                avg  = v12 / len(last12) if last12 else 0
+                avg  = v3 / len(last3) if last3 else 0  # Promedio = 3 semanas / 3
                 prod_data[p] = {
                     'v12': round(v12), 'v3': round(v3),
                     'emb': round(emb3), 'm3': round(m3),
