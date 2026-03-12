@@ -12,44 +12,21 @@ st.set_page_config(page_title="Walmex · CFBC", layout="wide", initial_sidebar_s
 
 st.markdown("""
 <style>
-/* 1. Eliminar padding/margin general */
-.main .block-container {
-    padding: 0 !important;
-    max-width: 100% !important;
-    margin: 0 !important;
-}
+.main .block-container { padding: 0 !important; max-width: 100% !important; margin: 0 !important; }
 .main { padding: 0 !important; overflow: hidden !important; }
 .stApp { margin: 0 !important; }
-
-/* 2. Ocultar interfaz nativa de Streamlit */
-[data-testid="stHeader"],
-[data-testid="stSidebar"],
-[data-testid="stToolbar"],
-[data-testid="stDecoration"],
-[data-testid="stStatusWidget"],
-#MainMenu, 
-header, 
-footer { 
-    display: none !important; 
-    visibility: hidden !important; 
-    height: 0 !important;
+[data-testid="stHeader"],[data-testid="stSidebar"],[data-testid="stToolbar"],
+[data-testid="stDecoration"],[data-testid="stStatusWidget"],
+#MainMenu, header, footer {
+    display: none !important; visibility: hidden !important; height: 0 !important;
 }
-
-/* 3. OPCIÓN NUCLEAR PARA LA MARCA DE AGUA Y BOTONES */
 .stDeployButton { display: none !important; }
-
-/* Ocultar por atributos de posición (esquina inferior derecha) */
-div[style*="bottom: 1.5rem"], 
-div[style*="bottom: 15px"],
+div[style*="bottom: 1.5rem"], div[style*="bottom: 15px"],
 div[style*="position: fixed"][style*="bottom"][style*="right"],
 iframe[src*="badge"] {
-    display: none !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
-    visibility: hidden !important;
+    display: none !important; opacity: 0 !important;
+    pointer-events: none !important; visibility: hidden !important;
 }
-
-/* Reducir gaps en tu iframe */
 [data-testid='stVerticalBlock'] { gap: 0 !important; padding: 0 !important; }
 div[data-testid='stHtml'] { padding: 0 !important; margin: 0 !important; line-height: 0 !important; }
 iframe { display: block !important; margin: 0 !important; border: none !important; }
@@ -97,11 +74,11 @@ def cargar_datos(path: str) -> dict:
             last3  = semanas[max(0, idx-2):idx+1]
             prod_data = {}
             for p in productos:
-                v12   = sum(by_stp[sem][t][p]['ventas_u']   for sem in last12)
-                v3    = sum(by_stp[sem][t][p]['ventas_u']   for sem in last3)
-                emb   = by_stp[s][t][p]['embarque_u']
-                m3    = sum(by_stp[sem][t][p]['merma_u']    for sem in last3)
-                avg   = v12 / len(last12) if last12 else 0
+                v12  = sum(by_stp[sem][t][p]['ventas_u']  for sem in last12)
+                v3   = sum(by_stp[sem][t][p]['ventas_u']  for sem in last3)
+                emb  = by_stp[s][t][p]['embarque_u']
+                m3   = sum(by_stp[sem][t][p]['merma_u']   for sem in last3)
+                avg  = v12 / len(last12) if last12 else 0
                 prod_data[p] = {
                     'v12': round(v12), 'v3': round(v3),
                     'emb': round(emb), 'm3': round(m3),
@@ -131,17 +108,13 @@ HTML = r"""<!DOCTYPE html>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:#fff;font-family:Arial,sans-serif;font-size:12px;color:#111}
-
-/* ── HEADER ── */
 .hdr{display:flex;align-items:center;justify-content:space-between;padding:6px 16px 4px;border-bottom:1px solid #ccc}
 .wm-logo{display:flex;align-items:center;gap:4px}
 .wm-text{font-size:1.2rem;font-weight:700;color:#0071ce;letter-spacing:-0.5px}
 .wm-spark{color:#ffc220;font-size:1.3rem;line-height:1}
-.hdr-right{display:flex;align-items:center;gap:10px;text-align:right;font-size:.72rem;color:#333;line-height:1.6}
+.hdr-right{display:flex;align-items:center;gap:12px;font-size:.72rem;color:#333;line-height:1.6}
 .hdr-tienda{padding:3px 16px 4px;font-size:.78rem;color:#333;border-bottom:1px solid #ddd}
 .hdr-tienda strong{font-size:.8rem}
-
-/* ── BOTÓN IMPRIMIR ── */
 .btn-print{
   display:inline-flex;align-items:center;gap:5px;
   padding:4px 14px;border-radius:4px;border:1px solid #0071ce;
@@ -149,8 +122,6 @@ body{background:#fff;font-family:Arial,sans-serif;font-size:12px;color:#111}
   cursor:pointer;transition:.15s;white-space:nowrap;flex-shrink:0;
 }
 .btn-print:hover{background:#0071ce;color:#fff}
-
-/* ── CONTROLS ── */
 .ctrl{display:flex;align-items:center;gap:8px;padding:5px 16px;background:#f5f7fa;border-bottom:1px solid #ddd;flex-wrap:wrap}
 .ctrl label{font-size:.7rem;color:#555;font-weight:600}
 select{border:1px solid #bbb;border-radius:4px;padding:3px 7px;font-size:.72rem;cursor:pointer;background:#fff}
@@ -158,13 +129,9 @@ select{border:1px solid #bbb;border-radius:4px;padding:3px 7px;font-size:.72rem;
 .chip{padding:2px 9px;border-radius:12px;font-size:.67rem;cursor:pointer;border:1px solid #bbb;color:#333;background:#fff;transition:.15s}
 .chip:hover{border-color:#0071ce;color:#0071ce}
 .chip.on{background:#0071ce;color:#fff;border-color:#0071ce}
-
-/* ── 4 TABLE GRID ── */
 .grid{display:grid;grid-template-columns:1fr 1fr;padding:8px 16px;gap:8px}
-
 .box{border:1px solid #bbb;border-radius:4px;overflow:hidden}
 .box-hdr{background:#f0f0f0;border-bottom:1px solid #bbb;padding:4px 10px;text-align:center;font-size:.74rem;font-weight:700;color:#111}
-
 table.t{width:100%;border-collapse:collapse}
 table.t th{padding:3px 10px;font-size:.67rem;font-weight:700;color:#333;border-bottom:1px solid #ccc;text-align:right;white-space:nowrap;background:#fafafa}
 table.t th:first-child{text-align:left}
@@ -174,30 +141,22 @@ table.t tr.total td{font-weight:700;border-top:1px solid #ddd;background:#f5f5f5
 table.t tr:hover:not(.total) td{background:#f0f7ff}
 .red{color:#c00;font-weight:600}
 .bold{font-weight:700}
-
-/* ── LOADER ── */
 #loader{position:fixed;inset:0;background:#fff;display:flex;align-items:center;justify-content:center;z-index:99;flex-direction:column;gap:10px}
 .ld-txt{font-size:.85rem;color:#0071ce;font-weight:600}
 .ld-bar{width:160px;height:3px;background:#dde;border-radius:2px;overflow:hidden}
 .ld-fill{height:100%;background:#0071ce;animation:ld .9s ease-in-out infinite}
 @keyframes ld{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}
-
-/* ── IMPRESIÓN ── */
-@media print{
-  .ctrl,.btn-print{display:none!important}
-  body{background:#fff!important}
-  .grid{grid-template-columns:1fr 1fr}
-  .box{break-inside:avoid;border:1px solid #999}
-}
 </style>
 </head>
 <body>
 
-<div id="loader"><div class="ld-txt">Cargando...</div><div class="ld-bar"><div class="ld-fill"></div></div></div>
+<div id="loader">
+  <div class="ld-txt">Cargando...</div>
+  <div class="ld-bar"><div class="ld-fill"></div></div>
+</div>
 
 <div id="app" style="display:none">
 
-  <!-- HEADER -->
   <div class="hdr">
     <div class="wm-logo">
       <div class="wm-text">Walmart</div>
@@ -208,13 +167,11 @@ table.t tr:hover:not(.total) td{background:#f0f7ff}
         <div id="hdrFecha">—</div>
         <div>Semana&nbsp;&nbsp;<strong id="hdrSem">—</strong></div>
       </div>
-      <!-- ✅ BOTÓN IMPRIMIR — abre ventana limpia sin Streamlit -->
       <button class="btn-print" onclick="imprimirReporte()">🖨️ Imprimir</button>
     </div>
   </div>
   <div class="hdr-tienda">Nombre de Tienda&nbsp;&nbsp;<strong id="hdrTienda">—</strong></div>
 
-  <!-- CONTROLS -->
   <div class="ctrl">
     <label>Semana:</label>
     <select id="semSel" onchange="onSem(this.value)"></select>
@@ -222,41 +179,34 @@ table.t tr:hover:not(.total) td{background:#f0f7ff}
     <div class="chip-wrap" id="chips"></div>
   </div>
 
-  <!-- 4 TABLES -->
   <div class="grid">
-
     <div class="box">
       <div class="box-hdr">Ventas Históricas</div>
       <table class="t"><thead><tr><th>Producto</th><th>12 Semanas</th><th>3 Semanas</th></tr></thead>
       <tbody id="tHist"></tbody></table>
     </div>
-
     <div class="box">
       <div class="box-hdr">Índice de Merma por Artículo Últimas 3 Semanas</div>
       <table class="t"><thead><tr><th>Producto</th><th>Embarque</th><th>3 Semanas</th></tr></thead>
       <tbody id="tMerma"></tbody></table>
     </div>
-
     <div class="box">
       <div class="box-hdr">Venta Promedio Semanal</div>
       <table class="t"><thead><tr><th>Producto</th><th>Promedio</th></tr></thead>
       <tbody id="tAvg"></tbody></table>
     </div>
-
     <div class="box">
       <div class="box-hdr" id="projTitle">Proyección Semana Siguiente</div>
       <table class="t"><thead><tr><th>Producto</th><th>Proyección</th></tr></thead>
       <tbody id="tProj"></tbody></table>
     </div>
-
   </div>
 </div>
 
 <script>
 var DATA = JSON.parse(atob('__DATA_JSON__'));
 var state = { semana: null, tienda: null };
-
-var DIAS = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+var DIAS  = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
 var MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 
 function fmt(v){ return Math.round(v||0).toLocaleString('es-MX'); }
@@ -265,7 +215,6 @@ function init(){
   window.onerror = function(m,s,l){
     document.body.innerHTML='<p style="padding:20px;color:red">Error: '+m+' (línea '+l+')</p>';
   };
-
   var sel = document.getElementById('semSel');
   DATA.semanas.forEach(function(s){
     var opt = document.createElement('option');
@@ -275,15 +224,11 @@ function init(){
     sel.appendChild(opt);
   });
   state.semana = DATA.semanas[DATA.semanas.length-1];
-  sel.value = state.semana;
+  sel.value    = state.semana;
   state.tienda = DATA.tiendas[0];
-
-  buildChips();
-  updateHeader();
-  render();
-
+  buildChips(); updateHeader(); render();
   document.getElementById('loader').style.display = 'none';
-  document.getElementById('app').style.display = 'block';
+  document.getElementById('app').style.display    = 'block';
 }
 
 function buildChips(){
@@ -294,18 +239,16 @@ function buildChips(){
 }
 
 function selTienda(t){ state.tienda=t; buildChips(); updateHeader(); render(); }
-
 function onSem(v){ state.semana=parseInt(v); updateHeader(); render(); }
 
 function updateHeader(){
-  var now = new Date();
-  var dia = DIAS[now.getDay()];
+  var now  = new Date();
+  var dia  = DIAS[now.getDay()];
   var fecha = dia.charAt(0).toUpperCase()+dia.slice(1)+', '+now.getDate()+' de '+MESES[now.getMonth()]+' de '+now.getFullYear();
-  document.getElementById('hdrFecha').textContent = fecha;
-  document.getElementById('hdrSem').textContent = state.semana%100;
-  document.getElementById('hdrTienda').textContent = state.tienda;
-  var nxtWk = (state.semana%100)+1;
-  document.getElementById('projTitle').textContent = 'Proyección Semana '+nxtWk;
+  document.getElementById('hdrFecha').textContent   = fecha;
+  document.getElementById('hdrSem').textContent     = state.semana%100;
+  document.getElementById('hdrTienda').textContent  = state.tienda;
+  document.getElementById('projTitle').textContent  = 'Proyección Semana '+(state.semana%100+1);
 }
 
 function getD(){
@@ -314,45 +257,34 @@ function getD(){
 }
 
 function render(){
-  var d = getD();
-  var prods = DATA.productos;
-
-  var totV12=0, totV3=0, totEmb=0, totM3=0, totAvg=0, totProj=0;
-  var histRows='', mermaRows='', avgRows='', projRows='';
-
+  var d = getD(), prods = DATA.productos;
+  var totV12=0,totV3=0,totEmb=0,totM3=0,totAvg=0,totProj=0;
+  var histRows='',mermaRows='',avgRows='',projRows='';
   prods.forEach(function(p){
-    var v = d[p]||{v12:0,v3:0,emb:0,m3:0,avg:0,proj:0,pct_merma:0};
+    var v = d[p]||{v12:0,v3:0,emb:0,m3:0,avg:0,proj:0};
     var name = p.replace('BQT ','');
     totV12+=v.v12; totV3+=v.v3; totEmb+=v.emb; totM3+=v.m3; totAvg+=v.avg; totProj+=v.proj;
-
-    histRows += '<tr><td>'+name+'</td><td>'+fmt(v.v12)+'</td><td>'+fmt(v.v3)+'</td></tr>';
-
-    var mCls = v.m3>0?'red':'';
-    mermaRows += '<tr><td>'+name+'</td><td>'+fmt(v.emb)+'</td>'+
-      '<td class="'+mCls+'">'+fmt(v.m3)+'</td></tr>';
-
-    avgRows += '<tr><td>'+name+'</td><td>'+Math.round(v.avg)+'</td></tr>';
-    projRows += '<tr><td>'+name+'</td><td class="bold">'+fmt(v.proj)+'</td></tr>';
+    histRows  += '<tr><td>'+name+'</td><td>'+fmt(v.v12)+'</td><td>'+fmt(v.v3)+'</td></tr>';
+    mermaRows += '<tr><td>'+name+'</td><td>'+fmt(v.emb)+'</td><td class="'+(v.m3>0?'red':'')+'">'+fmt(v.m3)+'</td></tr>';
+    avgRows   += '<tr><td>'+name+'</td><td>'+Math.round(v.avg)+'</td></tr>';
+    projRows  += '<tr><td>'+name+'</td><td class="bold">'+fmt(v.proj)+'</td></tr>';
   });
-
-  var pctTot = totEmb>0?Math.round(totM3/totEmb*100)+'%':'0%';
-
   histRows  += '<tr class="total"><td>Total</td><td>'+fmt(totV12)+'</td><td>'+fmt(totV3)+'</td></tr>';
   mermaRows += '<tr class="total"><td>Total</td><td>'+fmt(totEmb)+'</td><td class="red">'+fmt(totM3)+'</td></tr>';
   avgRows   += '<tr class="total"><td>Total</td><td>'+Math.round(totAvg)+'</td></tr>';
   projRows  += '<tr class="total"><td>Total</td><td>'+fmt(totProj)+'</td></tr>';
-
   document.getElementById('tHist').innerHTML  = histRows;
   document.getElementById('tMerma').innerHTML = mermaRows;
   document.getElementById('tAvg').innerHTML   = avgRows;
   document.getElementById('tProj').innerHTML  = projRows;
 }
 
-// ═══════════════════════════════════════════
-// IMPRIMIR — ventana nueva fuera del iframe de Streamlit
-// ═══════════════════════════════════════════
+// ─── IMPRIMIR ───────────────────────────────────────────────────────────────
+// Construye un HTML completo en memoria y lo abre en una pestaña nueva.
+// onafterprint cierra la pestaña para que no quede about:blank.
+// No hay footer con fecha — la fecha solo está en el encabezado.
+// ────────────────────────────────────────────────────────────────────────────
 function imprimirReporte(){
-  // Capturar estado actual
   var tienda  = document.getElementById('hdrTienda').textContent;
   var semana  = document.getElementById('hdrSem').textContent;
   var fecha   = document.getElementById('hdrFecha').textContent;
@@ -362,77 +294,82 @@ function imprimirReporte(){
   var tAvg    = document.getElementById('tAvg').innerHTML;
   var tProj   = document.getElementById('tProj').innerHTML;
 
-  var win = window.open('','_blank','width=960,height=760');
-  win.document.write('<!DOCTYPE html><html lang="es"><head>');
-  win.document.write('<meta charset="UTF-8">');
-  win.document.write('<title>Walmart CFBC · Sem '+semana+' · '+tienda+'</title>');
-  win.document.write('<style>'+
-    '*{box-sizing:border-box;margin:0;padding:0}'+
-    'body{background:#fff;font-family:Arial,sans-serif;font-size:12px;color:#111;padding:16px}'+
-    '.hdr{display:flex;align-items:center;justify-content:space-between;padding-bottom:8px;border-bottom:2px solid #0071ce;margin-bottom:6px}'+
-    '.logo{display:flex;align-items:center;gap:5px}'+
-    '.wm-text{font-size:1.3rem;font-weight:700;color:#0071ce}'+
-    '.wm-spark{color:#ffc220;font-size:1.4rem}'+
-    '.hdr-info{text-align:right;font-size:.72rem;color:#333;line-height:1.7}'+
-    '.sub{font-size:.78rem;color:#333;padding:4px 0 10px;border-bottom:1px solid #ddd;margin-bottom:12px}'+
-    '.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}'+
-    '.box{border:1px solid #bbb;border-radius:4px;overflow:hidden;break-inside:avoid}'+
-    '.box-hdr{background:#f0f0f0;border-bottom:1px solid #bbb;padding:4px 10px;text-align:center;font-size:.74rem;font-weight:700}'+
-    'table{width:100%;border-collapse:collapse}'+
-    'th{padding:3px 10px;font-size:.67rem;font-weight:700;color:#333;border-bottom:1px solid #ccc;text-align:right;background:#fafafa}'+
-    'th:first-child{text-align:left}'+
-    'td{padding:2px 10px;font-size:.72rem;text-align:right;color:#222;white-space:nowrap}'+
-    'td:first-child{text-align:left;color:#111}'+
-    'tr.total td{font-weight:700;border-top:1px solid #ddd;background:#f5f5f5}'+
-    '.red{color:#c00;font-weight:600}.bold{font-weight:700}'+
-    '.footer{margin-top:14px;font-size:.65rem;color:#999;text-align:center}'+
-    '@page{margin:10mm}'+
-    '@media print{body{padding:0}}'+
-  '</style></head><body>');
+  var css = [
+    '*{box-sizing:border-box;margin:0;padding:0}',
+    'body{background:#fff;font-family:Arial,sans-serif;font-size:12px;color:#111;padding:16px}',
+    '.hdr{display:flex;align-items:center;justify-content:space-between;',
+          'padding-bottom:8px;border-bottom:2px solid #0071ce;margin-bottom:8px}',
+    '.logo{display:flex;align-items:center;gap:5px}',
+    '.wm-text{font-size:1.3rem;font-weight:700;color:#0071ce}',
+    '.wm-spark{color:#ffc220;font-size:1.4rem}',
+    '.hdr-info{text-align:right;font-size:.72rem;color:#333;line-height:1.7}',
+    '.sub{font-size:.78rem;color:#333;padding:4px 0 10px;',
+         'border-bottom:1px solid #ddd;margin-bottom:12px}',
+    '.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}',
+    '.box{border:1px solid #bbb;border-radius:4px;overflow:hidden;break-inside:avoid}',
+    '.box-hdr{background:#f0f0f0;border-bottom:1px solid #bbb;padding:4px 10px;',
+             'text-align:center;font-size:.74rem;font-weight:700}',
+    'table{width:100%;border-collapse:collapse}',
+    'th{padding:3px 10px;font-size:.67rem;font-weight:700;color:#333;',
+       'border-bottom:1px solid #ccc;text-align:right;background:#fafafa}',
+    'th:first-child{text-align:left}',
+    'td{padding:2px 10px;font-size:.72rem;text-align:right;color:#222;white-space:nowrap}',
+    'td:first-child{text-align:left;color:#111}',
+    'tr.total td{font-weight:700;border-top:1px solid #ddd;background:#f5f5f5}',
+    '.red{color:#c00;font-weight:600}.bold{font-weight:700}',
+    '@page{margin:10mm}',
+    '@media print{body{padding:0}}'
+  ].join('');
 
-  win.document.write(
-    '<div class="hdr">'+
-      '<div class="logo">'+
-        '<span class="wm-text">Walmart</span>'+
-        '<span class="wm-spark">&#10022;</span>'+
-      '</div>'+
-      '<div class="hdr-info">'+
-        '<div>'+fecha+'</div>'+
-        '<div>Semana &nbsp;<strong>'+semana+'</strong></div>'+
-      '</div>'+
-    '</div>'+
-    '<div class="sub">Nombre de Tienda &nbsp;<strong>'+tienda+'</strong></div>'+
-    '<div class="grid">'+
-      '<div class="box"><div class="box-hdr">Ventas Históricas</div>'+
-        '<table><thead><tr><th>Producto</th><th>12 Semanas</th><th>3 Semanas</th></tr></thead>'+
-        '<tbody>'+tHist+'</tbody></table></div>'+
-      '<div class="box"><div class="box-hdr">Índice de Merma por Artículo Últimas 3 Semanas</div>'+
-        '<table><thead><tr><th>Producto</th><th>Embarque</th><th>3 Semanas</th></tr></thead>'+
-        '<tbody>'+tMerma+'</tbody></table></div>'+
-      '<div class="box"><div class="box-hdr">Venta Promedio Semanal</div>'+
-        '<table><thead><tr><th>Producto</th><th>Promedio</th></tr></thead>'+
-        '<tbody>'+tAvg+'</tbody></table></div>'+
-      '<div class="box"><div class="box-hdr">'+projTit+'</div>'+
-        '<table><thead><tr><th>Producto</th><th>Proyección</th></tr></thead>'+
-        '<tbody>'+tProj+'</tbody></table></div>'+
-    '</div>'
-  );
+  var html = '<!DOCTYPE html><html lang="es"><head>'
+    + '<meta charset="UTF-8">'
+    + '<title>Walmart CFBC \u00b7 Sem '+semana+' \u00b7 '+tienda+'</title>'
+    + '<style>'+css+'</style>'
+    + '</head><body>'
+    + '<div class="hdr">'
+    +   '<div class="logo">'
+    +     '<span class="wm-text">Walmart</span>'
+    +     '<span class="wm-spark">&#10022;</span>'
+    +   '</div>'
+    +   '<div class="hdr-info">'
+    +     '<div>'+fecha+'</div>'
+    +     '<div>Semana &nbsp;<strong>'+semana+'</strong></div>'
+    +   '</div>'
+    + '</div>'
+    + '<div class="sub">Nombre de Tienda &nbsp;<strong>'+tienda+'</strong></div>'
+    + '<div class="grid">'
+    +   '<div class="box"><div class="box-hdr">Ventas Hist\u00f3ricas</div>'
+    +     '<table><thead><tr><th>Producto</th><th>12 Semanas</th><th>3 Semanas</th></tr></thead>'
+    +     '<tbody>'+tHist+'</tbody></table></div>'
+    +   '<div class="box"><div class="box-hdr">\u00cdndice de Merma por Art\u00edculo \u00daltimas 3 Semanas</div>'
+    +     '<table><thead><tr><th>Producto</th><th>Embarque</th><th>3 Semanas</th></tr></thead>'
+    +     '<tbody>'+tMerma+'</tbody></table></div>'
+    +   '<div class="box"><div class="box-hdr">Venta Promedio Semanal</div>'
+    +     '<table><thead><tr><th>Producto</th><th>Promedio</th></tr></thead>'
+    +     '<tbody>'+tAvg+'</tbody></table></div>'
+    +   '<div class="box"><div class="box-hdr">'+projTit+'</div>'
+    +     '<table><thead><tr><th>Producto</th><th>Proyecci\u00f3n</th></tr></thead>'
+    +     '<tbody>'+tProj+'</tbody></table></div>'
+    + '</div>'
+    // ── SIN footer de fecha ──
+    + '<script>'
+    + 'window.onload=function(){'
+    +   'window.onafterprint=function(){window.close();};'
+    +   'setTimeout(function(){window.print();},300);'
+    + '};'
+    + '<\/script>'
+    + '</body></html>';
 
-  win.document.write('</body></html>');
-  win.document.close();
-
-  // Abrir diálogo de impresión y cerrar ventana al terminar
-  win.onload = function(){
-    setTimeout(function(){
-      win.print();
-      win.onafterprint = function(){ win.close(); };
-    }, 350);
-  };
+  // Usar Blob + URL para evitar about:blank en la pestaña
+  var blob = new Blob([html], {type:'text/html;charset=utf-8'});
+  var url  = URL.createObjectURL(blob);
+  var win  = window.open(url, '_blank');
+  // Liberar URL de objeto cuando la ventana cargue
+  if(win){ win.addEventListener('load', function(){ URL.revokeObjectURL(url); }); }
 }
 
 window.addEventListener('load', init);
 
-// Eliminar padding del frame padre de Streamlit
 (function fixParent(){
   try {
     var p = window.parent.document;
@@ -450,7 +387,6 @@ window.addEventListener('load', init);
       '.stDeployButton{display:none!important}',
       '#MainMenu{display:none!important}',
       'button[kind="header"]{display:none!important}',
-      '[data-testid="manage-app-button"]{display:none!important}',
       '.viewerBadge_container__r5tak{display:none!important}',
       '.styles_viewerBadge__CvC9N{display:none!important}',
       'a[href="https://streamlit.io"]{display:none!important}',
@@ -460,7 +396,6 @@ window.addEventListener('load', init);
     ].join('');
     p.head.appendChild(style);
   } catch(e){}
-  // Resize iframe to full viewport
   try {
     var frames = window.parent.document.querySelectorAll('iframe');
     frames.forEach(function(f){
