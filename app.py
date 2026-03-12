@@ -283,30 +283,41 @@ var MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','
 
 function fmt(v){ return Math.round(v||0).toLocaleString('es-MX'); }
 
+function showErr(msg){
+  document.getElementById('loader').style.display='none';
+  document.body.style.background='#fff';
+  document.body.innerHTML='<div style="padding:30px;font-family:Arial;color:#c00;font-size:14px">'
+    +'<b>Error al cargar dashboard:</b><br><pre style="margin-top:10px;white-space:pre-wrap">'+msg+'</pre></div>';
+}
+
 function init(){
-  window.onerror = function(m,s,l){
-    document.body.innerHTML='<p style="padding:20px;color:red">Error: '+m+' (línea '+l+')</p>';
+  window.onerror = function(m,s,l,c,err){
+    showErr(m + '\nLínea: '+l+' Col: '+c+'\n'+(err&&err.stack?err.stack:''));
+    return true;
   };
-  var sel = document.getElementById('semSel');
-  // Opción global al inicio
-  var optAll = document.createElement('option');
-  optAll.value = 'all';
-  optAll.textContent = '— Todas las semanas —';
-  sel.appendChild(optAll);
-  DATA.semanas.forEach(function(s){
-    var opt = document.createElement('option');
-    opt.value = s;
-    var yr = Math.floor(s/100), wk = s%100;
-    opt.textContent = yr+' · Semana '+String(wk).padStart(2,'0');
-    if(yr < 2000){ opt.textContent = 'Semana '+String(s).padStart(2,'0'); }
-    sel.appendChild(opt);
-  });
-  state.semana = DATA.semanas[DATA.semanas.length-1];
-  sel.value    = state.semana;
-  state.tienda = DATA.tiendas[0];
-  buildChips(); updateHeader(); render();
-  document.getElementById('loader').style.display = 'none';
-  document.getElementById('app').style.display    = 'block';
+  try {
+    if(!DATA || !DATA.semanas || !DATA.semanas.length){ showErr('DATA vacío o sin semanas'); return; }
+    if(!DATA.raw){ showErr('DATA.raw no existe. Claves disponibles: '+Object.keys(DATA).join(', ')); return; }
+    var sel = document.getElementById('semSel');
+    var optAll = document.createElement('option');
+    optAll.value = 'all'; optAll.textContent = '— Todas las semanas —';
+    sel.appendChild(optAll);
+    DATA.semanas.forEach(function(s){
+      var opt = document.createElement('option');
+      opt.value = s;
+      var yr = Math.floor(s/100), wk = s%100;
+      opt.textContent = yr < 2000 ? 'Semana '+String(s).padStart(2,'0') : yr+' · Semana '+String(wk).padStart(2,'0');
+      sel.appendChild(opt);
+    });
+    state.semana = DATA.semanas[DATA.semanas.length-1];
+    sel.value    = state.semana;
+    state.tienda = DATA.tiendas[0];
+    buildChips(); updateHeader(); render();
+    document.getElementById('loader').style.display = 'none';
+    document.getElementById('app').style.display    = 'block';
+  } catch(e) {
+    showErr(e.message + '\n' + (e.stack||''));
+  }
 }
 
 function buildChips(){
