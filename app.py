@@ -39,7 +39,7 @@ def cargar_datos(url: str = "") -> dict:
     excel_path = next((p for p in paths if Path(p).exists()), None)
     if not excel_path:
         raise FileNotFoundError("No se encontró Analisis_Walmart.xlsx. Súbelo al repo de GitHub.")
-    wb = openpyxl.load_workbook(excel_path, data_only=True)
+    wb = openpyxl.load_workbook(excel_path, data_only=True, read_only=True)
     ws = wb['Data']
 
     def sv(v):
@@ -88,18 +88,16 @@ def cargar_datos(url: str = "") -> dict:
             f"Todos los encabezados: {[h for h in headers if h]}"
         )
 
+    from datetime import datetime as _dt
     records = []
     for row in ws.iter_rows(min_row=2, values_only=True):
         producto  = str(row[idx_producto]).strip() if row[idx_producto] else None
         tienda    = str(row[idx_tienda]).strip()   if row[idx_tienda]   else None
-        # Semana: valor simple como 50, 51 etc
         try:
             semana_num = int(float(row[idx_semana])) if row[idx_semana] is not None else None
         except:
             semana_num = None
 
-        # Fecha: puede venir como datetime o string MM/DD/YYYY
-        from datetime import datetime as _dt
         fecha_raw = row[idx_fecha]
         anio = None
         if hasattr(fecha_raw, 'strftime'):
@@ -136,6 +134,7 @@ def cargar_datos(url: str = "") -> dict:
             'retail_vc':  sv(row[idx_retail_vc]) if idx_retail_vc is not None else 0,   # Retail VC Tienda
         })
 
+    wb.close()
     semanas   = sorted(set(r['semana'] for r in records))
     tiendas   = sorted(set(r['tienda']  for r in records))
     productos = sorted(set(r['producto'] for r in records))
@@ -154,74 +153,45 @@ def cargar_datos(url: str = "") -> dict:
         if r['fecha']:
             fecha_por_semana[r['semana']] = r['fecha']
 
-    # Precalcular índices para evitar semanas.index() en cada iteración
-    sem_idx = {s: i for i, s in enumerate(semanas)}
-
-    result = {}
-    for t in tiendas:
-        result[t] = {}
-        for s in semanas:
-            idx    = sem_idx[s]
-            last12 = semanas[max(0, idx-11):idx+1]
-            last3  = semanas[max(0, idx-2):idx+1]
-            prod_data = {}
-            tp = by_stp  # alias local
-            for p in productos:
-                v12 = v3 = emb3 = m3 = cfbc3 = retail3 = 0.0
-                for sem in last12:
-                    v12 += tp[sem][t][p]['ventas_u']
-                for sem in last3:
-                    row = tp[sem][t][p]
-                    v3      += row['ventas_u']
-                    emb3    += row['embarque_u']
-                    m3      += row['merma_u']
-                    cfbc3   += row['venta_cfbc']
-                    retail3 += row['retail_vc']
-                n3  = len(last3) or 1
-                avg = v3 / n3
-                mr  = m3 / emb3 if emb3 > 0 else 0
-                proj = avg / (1 - mr) if mr < 1 else avg
-                prod_data[p] = {
-                    'v12': round(v12), 'v3': round(v3),
-                    'emb': round(emb3), 'm3': round(m3),
-                    'avg': round(avg, 1), 'proj': round(proj),
-                    'pct_merma': round(m3/emb3*100) if emb3 > 0 else 0,
-                    'cfbc': round(cfbc3), 'retail': round(retail3),
-                }
-            result[t][s] = prod_data
-
-    # Un solo loop para todos los totales acumulados
-    totales_tienda         = defaultdict(lambda: defaultdict(float))
-    raw_semana_tienda      = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
-    totales_producto       = defaultdict(lambda: defaultdict(float))
-    totales_tienda_producto= defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
-
-    for r in records:
-        t2, s2, p2 = r['tienda'], r['semana'], r['producto']
-        for field in ('embarque_u','venta_cfbc','merma_u','retail_vc'):
-            v = r[field]
-            totales_tienda[t2][field]            += v
-            raw_semana_tienda[t2][s2][field]     += v
-            totales_producto[p2][field]          += v
-            totales_tienda_producto[t2][p2][field]+= v
-
-    # ── Totales por PRODUCTO (solo 2 estructuras livianas) ─────────────────────
-    # Global: todas las tiendas, todas las semanas
-    totales_producto = defaultdict(lambda: defaultdict(float))
-    # Por tienda: todas las semanas de esa tienda
+    # ── Un solo loop para todos los totales ────────────────────────────────────
+    totales_tienda          = defaultdict(lambda: defaultdict(float))
+    raw_semana_tienda       = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
+    totales_producto        = defaultdict(lambda: defaultdict(float))
     totales_tienda_producto = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
 
     for r in records:
-        for field in ['embarque_u', 'venta_cfbc', 'merma_u', 'retail_vc']:
-            totales_producto[r['producto']][field]                     += r[field]
-            totales_tienda_producto[r['tienda']][r['producto']][field] += r[field]
+        t2, s2, p2 = r['tienda'], r['semana'], r['producto']
+        for field in ('embarque_u', 'venta_cfbc', 'merma_u', 'retail_vc'):
+            v = r[field]
+            totales_tienda[t2][field]             += v
+            raw_semana_tienda[t2][s2][field]      += v
+            totales_producto[p2][field]           += v
+            totales_tienda_producto[t2][p2][field]+= v
+
+    # ── by_stp compacto: semana → tienda → producto → [vu, eu, mu, cfbc, retail]
+    # (lista en lugar de dict ahorra ~60% de tamaño en JSON)
+    raw = {}
+    for s in semanas:
+        sk = str(s)
+        raw[sk] = {}
+        for t in tiendas:
+            raw[sk][t] = {}
+            for p in productos:
+                d = by_stp[s][t][p]
+                vu = round(d['ventas_u'],2)
+                eu = round(d['embarque_u'],2)
+                mu = round(d['merma_u'],2)
+                cf = round(d['venta_cfbc'],2)
+                rv = round(d['retail_vc'],2)
+                if vu or eu or mu or cf or rv:   # omitir ceros — reduce tamaño 90%
+                    raw[sk][t][p] = [vu, eu, mu, cf, rv]
 
     return {
         'semanas':             semanas,
         'tiendas':             tiendas,
         'productos':           productos,
         'fecha_por_semana':    fecha_por_semana,
-        'data':                {t: {str(s): v for s, v in sv2.items()} for t, sv2 in result.items()},
+        'raw':                 raw,
         'totales_tienda':      {t: dict(v) for t, v in totales_tienda.items()},
         'raw_sem_t':           {t: {str(s): dict(v) for s, v in sv.items()} for t, sv in raw_semana_tienda.items()},
         'totales_producto':    {p: dict(v) for p, v in totales_producto.items()},
@@ -444,9 +414,42 @@ function updateHeader(){
   document.getElementById('projTitle').textContent  = 'Proyección Semana '+(semNum+1);
 }
 
+// ── Helper: raw[semKey][tienda][prod] → [vu,eu,mu,cf,rv] ──────────────────
+function rawVal(sk, t, p){ var x=(DATA.raw[sk]&&DATA.raw[sk][t]&&DATA.raw[sk][t][p]); return x||[0,0,0,0,0]; }
+
+// ── Calcular ventanas deslizantes para tienda+semana actual ─────────────────
+function calcProd(tienda, semana){
+  var semanas = DATA.semanas;
+  var idx = semanas.indexOf(semana);
+  if(idx<0) idx = semanas.length-1;
+  var last12 = semanas.slice(Math.max(0,idx-11), idx+1);
+  var last3  = semanas.slice(Math.max(0,idx-2),  idx+1);
+  var n3 = last3.length || 1;
+  var result = {};
+  DATA.productos.forEach(function(p){
+    var v12=0, v3=0, eu=0, mu=0, cf=0, rv=0;
+    last12.forEach(function(s){ v12 += rawVal(String(s),tienda,p)[0]; });
+    last3.forEach(function(s){
+      var r = rawVal(String(s),tienda,p);
+      v3+=r[0]; eu+=r[1]; mu+=r[2]; cf+=r[3]; rv+=r[4];
+    });
+    var avg = v3/n3;
+    var mr  = eu>0 ? mu/eu : 0;
+    var proj = mr<1 ? avg/(1-mr) : avg;
+    result[p] = {
+      v12:Math.round(v12), v3:Math.round(v3),
+      emb:Math.round(eu), m3:Math.round(mu),
+      avg:Math.round(avg*10)/10, proj:Math.round(proj),
+      pct_merma: eu>0 ? Math.round(mu/eu*100) : 0,
+      cfbc:Math.round(cf), retail:Math.round(rv)
+    };
+  });
+  return result;
+}
+
 function getD(){
-  var key = state.semana === 'all' ? String(DATA.semanas[DATA.semanas.length-1]) : String(state.semana);
-  return (DATA.data[state.tienda]&&DATA.data[state.tienda][key]) || {};
+  var sem = state.semana === 'all' ? DATA.semanas[DATA.semanas.length-1] : state.semana;
+  return calcProd(state.tienda, sem);
 }
 
 function render(){
@@ -532,14 +535,12 @@ function getProdData(tiendaSel, key, isAll){
         emb=d.embarque_u||0; cfbc=d.venta_cfbc||0; merma=d.merma_u||0; retail=d.retail_vc||0;
       }
     } else {
-      // semana específica: sumar sobre tiendas desde DATA.data (ya en memoria)
+      // semana específica: sumar desde DATA.raw
       var tLista = tiendaSel ? [tiendaSel] : tiendas;
       tLista.forEach(function(t){
-        var d = ((DATA.data[t]||{})[key]||{})[p] || {};
-        emb   += d.emb    || 0;
-        cfbc  += d.cfbc   || 0;
-        merma += d.m3     || 0;
-        retail+= d.retail || 0;
+        var r = rawVal(key, t, p);
+        emb   += r[1]; cfbc  += r[3];
+        merma += r[2]; retail+= r[4];
       });
     }
     return {prod:p, emb:emb, cfbc:cfbc, merma:merma, retail:retail};
