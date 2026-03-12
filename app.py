@@ -273,22 +273,22 @@ table.t tr:hover:not(.total) td{background:#f0f7ff}
   <div class="grid" id="viewTienda" style="display:none">
     <div class="box">
       <div class="box-hdr">Top Venta</div>
-      <table class="t"><thead><tr><th>Tienda</th><th>12 Semanas</th><th>3 Semanas</th></tr></thead>
+      <table class="t"><thead><tr><th>Tienda</th><th>UNIDADES</th><th>VENTA</th><th>%</th></tr></thead>
       <tbody id="tHistT"></tbody></table>
     </div>
     <div class="box">
       <div class="box-hdr">Top Merma</div>
-      <table class="t"><thead><tr><th>Tienda</th><th>Embarque</th><th>Merma</th><th>Merma %</th></tr></thead>
+      <table class="t"><thead><tr><th>Tienda</th><th>UNIDADES</th><th>$</th><th>CANTIDAD</th><th>%</th></tr></thead>
       <tbody id="tMermaT"></tbody></table>
     </div>
     <div class="box">
       <div class="box-hdr">Venta Promedio Semanal</div>
-      <table class="t"><thead><tr><th>Tienda</th><th>Promedio</th></tr></thead>
+      <table class="t"><thead><tr><th>Tienda</th><th></th></tr></thead>
       <tbody id="tAvgT"></tbody></table>
     </div>
     <div class="box">
       <div class="box-hdr">Comparacion Ultimas 3 Semanas</div>
-      <table class="t"><thead><tr><th>Tienda</th><th>Proyección</th></tr></thead>
+      <table class="t"><thead><tr><th>Tienda</th><th></th></tr></thead>
       <tbody id="tProjT"></tbody></table>
     </div>
   </div>
@@ -396,28 +396,35 @@ function renderTienda(){
   var tiendas = DATA.tiendas;
   var prods = DATA.productos;
   var totV12=0,totV3=0,totEmb=0,totM3=0,totAvg=0,totProj=0,totEmb2=0;
-  var histRows='',mermaRows='',avgRows='',projRows='';
+  var tiendaData = [];
   
+  // Primer pass: calcular totales por tienda
   tiendas.forEach(function(tienda){
     var v12t=0,v3t=0,emb3t=0,m3t=0,avg3t=0,proj3t=0,emb2t=0;
     prods.forEach(function(p){
       var d = (DATA.data[tienda]&&DATA.data[tienda][key]&&DATA.data[tienda][key][p]) || {v12:0,v3:0,emb:0,m3:0,avg:0,proj:0};
       v12t+=d.v12; v3t+=d.v3; emb3t+=d.emb; m3t+=d.m3; avg3t+=d.avg; proj3t+=d.proj; emb2t+=d.emb;
     });
-    
     totV12+=v12t; totV3+=v3t; totEmb+=emb3t; totM3+=m3t; totAvg+=avg3t; totProj+=proj3t; totEmb2+=emb2t;
-    var pct_merma_t = emb3t > 0 ? Math.round(m3t/emb3t*100) : 0;
-    var avg_semanal = v3t / 3;
-    
-    histRows  += '<tr><td>'+tienda+'</td><td>'+fmt(v12t)+'</td><td>'+fmt(v3t)+'</td></tr>';
-    mermaRows += '<tr><td>'+tienda+'</td><td>'+fmt(emb3t)+'</td><td class="'+(m3t>0?'red':'')+'">'+fmt(m3t)+'</td><td class="'+(pct_merma_t>0?'red':'')+'">'+pct_merma_t+'%</td></tr>';
-    avgRows   += '<tr><td>'+tienda+'</td><td>'+Math.round(avg_semanal)+'</td></tr>';
-    projRows  += '<tr><td>'+tienda+'</td><td class="bold">'+fmt(proj3t)+'</td></tr>';
+    tiendaData.push({tienda:tienda, v12:v12t, v3:v3t, emb:emb3t, m3:m3t, avg:avg3t, proj:proj3t, emb2:emb2t});
   });
   
-  histRows  += '<tr class="total"><td>Total</td><td>'+fmt(totV12)+'</td><td>'+fmt(totV3)+'</td></tr>';
+  // Segundo pass: generar filas con porcentajes correctos
+  var histRows='',mermaRows='',avgRows='',projRows='';
+  tiendaData.forEach(function(t){
+    var pct_venta = totV12 > 0 ? Math.round(t.v12/totV12*100) : 0;
+    var pct_merma_t = t.emb > 0 ? Math.round(t.m3/t.emb*100) : 0;
+    var avg_semanal = t.v3 / 3;
+    
+    histRows  += '<tr><td>'+t.tienda+'</td><td>'+fmt(t.v12)+'</td><td>$ '+fmt(t.v12)+'</td><td>'+pct_venta+'%</td></tr>';
+    mermaRows += '<tr><td>'+t.tienda+'</td><td>'+fmt(t.emb)+'</td><td>$</td><td class="'+(t.m3>0?'red':'')+'">'+fmt(t.m3)+'</td><td class="'+(pct_merma_t>0?'red':'')+'">'+pct_merma_t+'%</td></tr>';
+    avgRows   += '<tr><td>'+t.tienda+'</td><td>'+Math.round(avg_semanal)+'</td></tr>';
+    projRows  += '<tr><td>'+t.tienda+'</td><td class="bold">'+fmt(t.proj)+'</td></tr>';
+  });
+  
+  histRows  += '<tr class="total"><td>Total</td><td>'+fmt(totV12)+'</td><td>$ '+fmt(totV12)+'</td><td>100%</td></tr>';
   var pct_merma_total = totEmb2 > 0 ? Math.round(totM3/totEmb2*100) : 0;
-  mermaRows += '<tr class="total"><td>Total</td><td>'+fmt(totEmb)+'</td><td class="red">'+fmt(totM3)+'</td><td class="red">'+pct_merma_total+'%</td></tr>';
+  mermaRows += '<tr class="total"><td>Total</td><td>'+fmt(totEmb)+'</td><td>$</td><td class="red">'+fmt(totM3)+'</td><td class="red">'+pct_merma_total+'%</td></tr>';
   var avg_total = totV3 / 3;
   avgRows   += '<tr class="total"><td>Total</td><td>'+Math.round(avg_total)+'</td></tr>';
   projRows  += '<tr class="total"><td>Total</td><td>'+fmt(totProj)+'</td></tr>';
