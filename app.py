@@ -319,6 +319,12 @@ window.addEventListener('load', init);
       'iframe{margin:0!important}',
       'section[data-testid="stMain"]{padding:0!important}',
       '.stMainBlockContainer{padding:0!important}',
+      '[data-testid="manage-app-button"]{display:none!important}',
+      '.stDeployButton{display:none!important}',
+      '#MainMenu{display:none!important}',
+      'button[kind="header"]{display:none!important}',
+      '.viewerBadge_container__r5tak{display:none!important}',
+      '.styles_viewerBadge__CvC9N{display:none!important}',
     ].join('');
     p.head.appendChild(style);
   } catch(e){}
