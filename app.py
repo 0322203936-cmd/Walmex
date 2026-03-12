@@ -63,14 +63,33 @@ def cargar_datos(url: str) -> dict:
     for row in ws.iter_rows(min_row=2, values_only=True):
         producto  = str(row[idx_producto]).strip() if row[idx_producto] else None
         tienda    = str(row[idx_tienda]).strip()   if row[idx_tienda]   else None
-        semana    = int(row[idx_semana])            if row[idx_semana]   else None
+        semana    = row[idx_semana] if row[idx_semana] is not None else None
+        # Fecha: puede venir como datetime, string MM/DD/YYYY o DD/MM/YYYY
         fecha_raw = row[idx_fecha]
         if hasattr(fecha_raw, 'strftime'):
+            # openpyxl ya la parseó como datetime
             fecha = fecha_raw.strftime('%d/%m/%Y')
         elif fecha_raw:
-            fecha = str(fecha_raw).strip()
+            s_fecha = str(fecha_raw).strip()
+            # Intentar parsear MM/DD/YYYY
+            try:
+                from datetime import datetime
+                dt = datetime.strptime(s_fecha, '%m/%d/%Y')
+                fecha = dt.strftime('%d/%m/%Y')
+            except:
+                try:
+                    from datetime import datetime
+                    dt = datetime.strptime(s_fecha, '%d/%m/%Y')
+                    fecha = dt.strftime('%d/%m/%Y')
+                except:
+                    fecha = s_fecha
         else:
             fecha = ''
+        # Semana puede venir como float (ej: 6.0) — convertir a int
+        try:
+            semana = int(float(semana)) if semana is not None else None
+        except:
+            semana = None
         if not producto or not tienda or not semana: continue
         records.append({
             'producto':   producto,
