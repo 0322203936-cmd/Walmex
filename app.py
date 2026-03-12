@@ -241,9 +241,13 @@ table.t tr:hover:not(.total) td{background:#f0f7ff}
     <select id="semSel" onchange="onSem(this.value)"></select>
     <label>Tienda:</label>
     <div class="chip-wrap" id="chips"></div>
+    <div style="margin-top:12px; display:flex; gap:8px;">
+      <button onclick="setView('producto')" id="btnProd" style="padding:6px 12px; background:#0071ce; color:white; border:none; border-radius:4px; cursor:pointer; font-weight:600;">📊 Producto</button>
+      <button onclick="setView('tienda')" id="btnTiend" style="padding:6px 12px; background:#ccc; color:#333; border:none; border-radius:4px; cursor:pointer; font-weight:600;">🏪 Tienda</button>
+    </div>
   </div>
 
-  <div class="grid">
+  <div class="grid" id="viewProducto">
     <div class="box">
       <div class="box-hdr">Ventas Históricas</div>
       <table class="t"><thead><tr><th>Producto</th><th>12 Semanas</th><th>3 Semanas</th></tr></thead>
@@ -265,11 +269,34 @@ table.t tr:hover:not(.total) td{background:#f0f7ff}
       <tbody id="tProj"></tbody></table>
     </div>
   </div>
+
+  <div class="grid" id="viewTienda" style="display:none">
+    <div class="box">
+      <div class="box-hdr">Ventas Históricas</div>
+      <table class="t"><thead><tr><th>Tienda</th><th>12 Semanas</th><th>3 Semanas</th></tr></thead>
+      <tbody id="tHistT"></tbody></table>
+    </div>
+    <div class="box">
+      <div class="box-hdr">Índice de Merma por Artículo Últimas 3 Semanas</div>
+      <table class="t"><thead><tr><th>Tienda</th><th>Embarque</th><th>Merma</th><th>Merma %</th></tr></thead>
+      <tbody id="tMermaT"></tbody></table>
+    </div>
+    <div class="box">
+      <div class="box-hdr">Venta Promedio Semanal</div>
+      <table class="t"><thead><tr><th>Tienda</th><th>Promedio</th></tr></thead>
+      <tbody id="tAvgT"></tbody></table>
+    </div>
+    <div class="box">
+      <div class="box-hdr" id="projTitleT">Proyección Semana Siguiente</div>
+      <table class="t"><thead><tr><th>Tienda</th><th>Proyección</th></tr></thead>
+      <tbody id="tProjT"></tbody></table>
+    </div>
+  </div>
 </div>
 
 <script>
 var DATA = JSON.parse(atob('__DATA_JSON__'));
-var state = { semana: null, tienda: null };
+var state = { semana: null, tienda: null, view: 'producto' };
 var DIAS  = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
 var MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 
@@ -304,8 +331,8 @@ function buildChips(){
   }).join('');
 }
 
-function selTienda(t){ state.tienda=t; buildChips(); updateHeader(); render(); }
-function onSem(v){ state.semana=parseInt(v); updateHeader(); render(); }
+function selTienda(t){ state.tienda=t; buildChips(); updateHeader(); if(state.view==='producto') render(); else renderTienda(); }
+function onSem(v){ state.semana=parseInt(v); updateHeader(); if(state.view==='producto') render(); else renderTienda(); }
 
 function updateHeader(){
   // Fecha real del Excel según semana seleccionada
@@ -350,6 +377,55 @@ function render(){
   document.getElementById('tMerma').innerHTML = mermaRows;
   document.getElementById('tAvg').innerHTML   = avgRows;
   document.getElementById('tProj').innerHTML  = projRows;
+}
+
+function setView(v){
+  state.view = v;
+  document.getElementById('btnProd').style.background = v==='producto' ? '#0071ce' : '#ccc';
+  document.getElementById('btnProd').style.color = v==='producto' ? 'white' : '#333';
+  document.getElementById('btnTiend').style.background = v==='tienda' ? '#0071ce' : '#ccc';
+  document.getElementById('btnTiend').style.color = v==='tienda' ? 'white' : '#333';
+  document.getElementById('viewProducto').style.display = v==='producto' ? 'grid' : 'none';
+  document.getElementById('viewTienda').style.display = v==='tienda' ? 'grid' : 'none';
+  if(v==='tienda') renderTienda();
+  else render();
+}
+
+function renderTienda(){
+  var key = String(state.semana);
+  var tiendas = DATA.tiendas;
+  var prods = DATA.productos;
+  var totV12=0,totV3=0,totEmb=0,totM3=0,totAvg=0,totProj=0,totEmb2=0;
+  var histRows='',mermaRows='',avgRows='',projRows='';
+  
+  tiendas.forEach(function(tienda){
+    var v12t=0,v3t=0,emb3t=0,m3t=0,avg3t=0,proj3t=0,emb2t=0;
+    prods.forEach(function(p){
+      var d = (DATA.data[tienda]&&DATA.data[tienda][key]&&DATA.data[tienda][key][p]) || {v12:0,v3:0,emb:0,m3:0,avg:0,proj:0};
+      v12t+=d.v12; v3t+=d.v3; emb3t+=d.emb; m3t+=d.m3; avg3t+=d.avg; proj3t+=d.proj; emb2t+=d.emb;
+    });
+    
+    totV12+=v12t; totV3+=v3t; totEmb+=emb3t; totM3+=m3t; totAvg+=avg3t; totProj+=proj3t; totEmb2+=emb2t;
+    var pct_merma_t = emb3t > 0 ? Math.round(m3t/emb3t*100) : 0;
+    var avg_semanal = v3t / 3;
+    
+    histRows  += '<tr><td>'+tienda+'</td><td>'+fmt(v12t)+'</td><td>'+fmt(v3t)+'</td></tr>';
+    mermaRows += '<tr><td>'+tienda+'</td><td>'+fmt(emb3t)+'</td><td class="'+(m3t>0?'red':'')+'">'+fmt(m3t)+'</td><td class="'+(pct_merma_t>0?'red':'')+'">'+pct_merma_t+'%</td></tr>';
+    avgRows   += '<tr><td>'+tienda+'</td><td>'+Math.round(avg_semanal)+'</td></tr>';
+    projRows  += '<tr><td>'+tienda+'</td><td class="bold">'+fmt(proj3t)+'</td></tr>';
+  });
+  
+  histRows  += '<tr class="total"><td>Total</td><td>'+fmt(totV12)+'</td><td>'+fmt(totV3)+'</td></tr>';
+  var pct_merma_total = totEmb2 > 0 ? Math.round(totM3/totEmb2*100) : 0;
+  mermaRows += '<tr class="total"><td>Total</td><td>'+fmt(totEmb)+'</td><td class="red">'+fmt(totM3)+'</td><td class="red">'+pct_merma_total+'%</td></tr>';
+  var avg_total = totV3 / 3;
+  avgRows   += '<tr class="total"><td>Total</td><td>'+Math.round(avg_total)+'</td></tr>';
+  projRows  += '<tr class="total"><td>Total</td><td>'+fmt(totProj)+'</td></tr>';
+  
+  document.getElementById('tHistT').innerHTML  = histRows;
+  document.getElementById('tMermaT').innerHTML = mermaRows;
+  document.getElementById('tAvgT').innerHTML   = avgRows;
+  document.getElementById('tProjT').innerHTML  = projRows;
 }
 
 // ─── IMPRIMIR ───────────────────────────────────────────────────────────────
