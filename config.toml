@@ -1,5 +1,7 @@
-[ui]
-hideSidebarNav = true
+[server]
+port = 8501
+headless = true
+address = "0.0.0.0"
 
-[browser]
-gatherUsageStats = false
+[client]
+showErrorDetails = true
