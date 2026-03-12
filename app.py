@@ -29,11 +29,17 @@ section[data-testid='stSidebar'] { display:none !important; }
 div[data-testid='stHtml'] { padding: 0 !important; margin: 0 !important; line-height: 0 !important; }
 iframe { display: block !important; margin: 0 !important; border: none !important; }
 /* Ocultar badge Made with Streamlit */
-footer { display: none !important; }
-[data-testid="stBottom"] { display: none !important; }
+footer { display: none !important; visibility: hidden !important; }
+[data-testid="stBottom"] { display: none !important; visibility: hidden !important; }
 .viewerBadge_container__r5tak { display: none !important; }
 .styles_viewerBadge__CvC9N { display: none !important; }
 a[href="https://streamlit.io"] { display: none !important; }
+[data-testid="stActionButtonIcon"] { display: none !important; }
+.stActionButton { display: none !important; }
+#stDecoration { display: none !important; }
+/* Nuclear option - ocultar todo en la parte inferior */
+.st-emotion-cache-1dp5vir { display: none !important; }
+.st-emotion-cache-h4xjwg { display: none !important; }
 </style>""", unsafe_allow_html=True)
 
 @st.cache_data(ttl=3600)
