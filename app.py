@@ -33,9 +33,12 @@ iframe { display: block !important; margin: 0 !important; border: none !importan
 </style>
 """, unsafe_allow_html=True)
 
-@st.cache_data(ttl=3600, show_spinner=False)
-def cargar_datos(path: str) -> dict:
-    wb = openpyxl.load_workbook(path, data_only=True)
+@st.cache_data(ttl=60, show_spinner=False)
+def cargar_datos(url: str) -> dict:
+    import io, requests
+    resp = requests.get(url)
+    resp.raise_for_status()
+    wb = openpyxl.load_workbook(io.BytesIO(resp.content), data_only=True)
     ws = wb['Data']
 
     def sv(v):
@@ -94,9 +97,7 @@ def cargar_datos(path: str) -> dict:
         'data': {t: {str(s): v for s, v in sv2.items()} for t, sv2 in result.items()},
     }
 
-EXCEL_PATH = "Analisis_Walmart.xlsx"
-if not Path(EXCEL_PATH).exists():
-    EXCEL_PATH = "/mnt/user-data/uploads/Analisis_Walmart.xlsx"
+EXCEL_PATH = "https://pacificafarms.sharepoint.com/:x:/r/sites/requerimientovsproyeccion/_layouts/15/Doc.aspx?sourcedoc=%7B358085E2-622B-43C9-9587-1C90E3F7899A%7D&file=Analisis%20Walmart.xlsx&action=default&mobileredirect=true&download=1"
 
 DATA = cargar_datos(EXCEL_PATH)
 
