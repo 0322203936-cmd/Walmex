@@ -412,6 +412,18 @@ function setView(v){
   document.getElementById('btnTiend').style.color = v==='tienda' ? 'white' : '#333';
   document.getElementById('viewProducto').style.display = v==='producto' ? 'grid' : 'none';
   document.getElementById('viewTienda').style.display = v==='tienda' ? 'grid' : 'none';
+  
+  // Ocultar filtros de tienda en vista Tienda
+  var chipWrap = document.querySelector('.chip-wrap');
+  var tiendaLabel = Array.from(document.querySelectorAll('.ctrl label')).find(el => el.textContent === 'Tienda:');
+  if(v==='tienda'){
+    if(chipWrap) chipWrap.style.display = 'none';
+    if(tiendaLabel) tiendaLabel.style.display = 'none';
+  } else {
+    if(chipWrap) chipWrap.style.display = 'flex';
+    if(tiendaLabel) tiendaLabel.style.display = 'block';
+  }
+  
   if(v==='tienda') renderTienda();
   else render();
 }
