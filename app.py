@@ -432,48 +432,30 @@ function renderTienda(){
   var tiendas = DATA.tiendas;
   var prods = DATA.productos;
   var key = String(state.semana);
-  var isGlobal = !state.semana || state.semana === DATA.semanas[DATA.semanas.length-1]; // global si es la última semana (default)
   
-  // TOP VENTA y TOP MERMA: Dinámicas (global o por semana según estado)
-  var totEmb=0,totV12=0,totMerma=0,totRetail=0;
-  var tiendaDataTop = [];
+  // TOP VENTA y TOP MERMA: SIEMPRE GLOBALES (todas las fechas, todas las tiendas)
+  var totEmb_global=0,totV12_global=0,totMerma_global=0,totRetail_global=0;
+  var tiendaDataGlobal = [];
   
-  if(isGlobal){
-    // GLOBAL: Todas las semanas
-    tiendas.forEach(function(tienda){
-      var emb_g=0,v12_g=0,merma_g=0,retail_g=0;
-      for(var semIdx=0; semIdx<DATA.semanas.length; semIdx++){
-        var sem = DATA.semanas[semIdx];
-        var semKey = String(sem);
-        for(var pIdx=0; pIdx<prods.length; pIdx++){
-          var p = prods[pIdx];
-          if(DATA.data[tienda]&&DATA.data[tienda][semKey]&&DATA.data[tienda][semKey][p]){
-            var d = DATA.data[tienda][semKey][p];
-            emb_g += (d.emb||0);
-            v12_g += (d.v12||0);
-            merma_g += (d.m3||0);
-            retail_g += (d.retail||0);
-          }
+  tiendas.forEach(function(tienda){
+    var emb_g=0,v12_g=0,merma_g=0,retail_g=0;
+    for(var semIdx=0; semIdx<DATA.semanas.length; semIdx++){
+      var sem = DATA.semanas[semIdx];
+      var semKey = String(sem);
+      for(var pIdx=0; pIdx<prods.length; pIdx++){
+        var p = prods[pIdx];
+        if(DATA.data[tienda]&&DATA.data[tienda][semKey]&&DATA.data[tienda][semKey][p]){
+          var d = DATA.data[tienda][semKey][p];
+          emb_g += (d.emb||0);
+          v12_g += (d.v12||0);
+          merma_g += (d.m3||0);
+          retail_g += (d.retail||0);
         }
       }
-      totEmb+=emb_g; totV12+=v12_g; totMerma+=merma_g; totRetail+=retail_g;
-      tiendaDataTop.push({tienda:tienda, emb:emb_g, v12:v12_g, merma:merma_g, retail:retail_g});
-    });
-  } else {
-    // POR SEMANA: Solo la semana seleccionada
-    tiendas.forEach(function(tienda){
-      var emb_s=0,v12_s=0,merma_s=0,retail_s=0;
-      prods.forEach(function(p){
-        var d = (DATA.data[tienda]&&DATA.data[tienda][key]&&DATA.data[tienda][key][p]) || {emb:0,v12:0,m3:0,retail:0};
-        emb_s += (d.emb||0);
-        v12_s += (d.v12||0);
-        merma_s += (d.m3||0);
-        retail_s += (d.retail||0);
-      });
-      totEmb+=emb_s; totV12+=v12_s; totMerma+=merma_s; totRetail+=retail_s;
-      tiendaDataTop.push({tienda:tienda, emb:emb_s, v12:v12_s, merma:merma_s, retail:retail_s});
-    });
-  }
+    }
+    totEmb_global+=emb_g; totV12_global+=v12_g; totMerma_global+=merma_g; totRetail_global+=retail_g;
+    tiendaDataGlobal.push({tienda:tienda, emb:emb_g, v12:v12_g, merma:merma_g, retail:retail_g});
+  });
   
   // DATOS POR SEMANA ACTUAL para Venta Promedio y Comparación
   var totAvg=0,totProj=0;
@@ -489,22 +471,22 @@ function renderTienda(){
     tiendaDataSem.push({tienda:tienda, v3:v3t, avg:avg3t, proj:proj3t});
   });
   
-  // Generar filas para TOP VENTA
+  // Generar filas para TOP VENTA (GLOBAL)
   var histRows='';
-  tiendaDataTop.forEach(function(t){
-    var pct_venta = totV12 > 0 ? Math.round(t.v12/totV12*100) : 0;
+  tiendaDataGlobal.forEach(function(t){
+    var pct_venta = totV12_global > 0 ? Math.round(t.v12/totV12_global*100) : 0;
     histRows  += '<tr><td>'+t.tienda+'</td><td>'+fmt(t.emb)+'</td><td>$ '+fmt(t.v12)+'</td><td>'+pct_venta+'%</td></tr>';
   });
-  histRows  += '<tr class="total"><td>Total</td><td>'+fmt(totEmb)+'</td><td>$ '+fmt(totV12)+'</td><td>100%</td></tr>';
+  histRows  += '<tr class="total"><td>Total</td><td>'+fmt(totEmb_global)+'</td><td>$ '+fmt(totV12_global)+'</td><td>100%</td></tr>';
   
-  // Generar filas para TOP MERMA
+  // Generar filas para TOP MERMA (GLOBAL)
   var mermaRows='';
-  tiendaDataTop.forEach(function(t){
+  tiendaDataGlobal.forEach(function(t){
     var pct_retail = t.emb > 0 ? Math.round(t.retail/t.emb*100) : 0;
     mermaRows += '<tr><td>'+t.tienda+'</td><td>'+fmt(t.merma)+'</td><td>$</td><td class="'+(t.retail>0?'red':'')+'">'+fmt(t.retail)+'</td><td class="'+(pct_retail>0?'red':'')+'">'+pct_retail+'%</td></tr>';
   });
-  var pct_retail_total = totEmb > 0 ? Math.round(totRetail/totEmb*100) : 0;
-  mermaRows += '<tr class="total"><td>Total</td><td>'+fmt(totMerma)+'</td><td>$</td><td class="red">'+fmt(totRetail)+'</td><td class="red">'+pct_retail_total+'%</td></tr>';
+  var pct_retail_total = totEmb_global > 0 ? Math.round(totRetail_global/totEmb_global*100) : 0;
+  mermaRows += '<tr class="total"><td>Total</td><td>'+fmt(totMerma_global)+'</td><td>$</td><td class="red">'+fmt(totRetail_global)+'</td><td class="red">'+pct_retail_total+'%</td></tr>';
   
   // Generar filas para Venta Promedio (datos de la semana actual)
   var avgRows='';
