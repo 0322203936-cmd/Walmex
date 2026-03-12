@@ -167,22 +167,28 @@ def cargar_datos(url: str = "") -> dict:
                 }
             result[t][s] = prod_data
 
-    # Totales crudos acumulados por tienda (TODAS las fechas, sin ventanas deslizantes)
+    # Totales crudos acumulados por tienda — GLOBAL (todas las fechas, sin ventanas deslizantes)
     totales_tienda = defaultdict(lambda: defaultdict(float))
+    # Totales crudos por tienda+semana — para filtrar por semana específica
+    raw_semana = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
     for r in records:
-        totales_tienda[r['tienda']]['ventas_u']   += r['ventas_u']
-        totales_tienda[r['tienda']]['merma_u']    += r['merma_u']
         totales_tienda[r['tienda']]['embarque_u'] += r['embarque_u']
         totales_tienda[r['tienda']]['venta_cfbc'] += r['venta_cfbc']
+        totales_tienda[r['tienda']]['merma_u']    += r['merma_u']
         totales_tienda[r['tienda']]['retail_vc']  += r['retail_vc']
+        raw_semana[r['tienda']][r['semana']]['embarque_u'] += r['embarque_u']
+        raw_semana[r['tienda']][r['semana']]['venta_cfbc'] += r['venta_cfbc']
+        raw_semana[r['tienda']][r['semana']]['merma_u']    += r['merma_u']
+        raw_semana[r['tienda']][r['semana']]['retail_vc']  += r['retail_vc']
 
     return {
         'semanas':          semanas,
         'tiendas':          tiendas,
         'productos':        productos,
         'fecha_por_semana': fecha_por_semana,
-        'data': {t: {str(s): v for s, v in sv2.items()} for t, sv2 in result.items()},
+        'data':             {t: {str(s): v for s, v in sv2.items()} for t, sv2 in result.items()},
         'totales_tienda':   {t: dict(v) for t, v in totales_tienda.items()},
+        'raw_semana':       {t: {str(s): dict(v) for s, v in sv.items()} for t, sv in raw_semana.items()},
     }
 
 try:
@@ -342,12 +348,16 @@ function init(){
     document.body.innerHTML='<p style="padding:20px;color:red">Error: '+m+' (línea '+l+')</p>';
   };
   var sel = document.getElementById('semSel');
+  // Opción global al inicio
+  var optAll = document.createElement('option');
+  optAll.value = 'all';
+  optAll.textContent = '— Todas las semanas —';
+  sel.appendChild(optAll);
   DATA.semanas.forEach(function(s){
     var opt = document.createElement('option');
     opt.value = s;
     var yr = Math.floor(s/100), wk = s%100;
     opt.textContent = yr+' · Semana '+String(wk).padStart(2,'0');
-    // solo mostrar si el año es razonable (mayor a 2000)
     if(yr < 2000){ opt.textContent = 'Semana '+String(s).padStart(2,'0'); }
     sel.appendChild(opt);
   });
@@ -367,10 +377,19 @@ function buildChips(){
 }
 
 function selTienda(t){ state.tienda=t; buildChips(); updateHeader(); if(state.view==='producto') render(); else renderTienda(); }
-function onSem(v){ state.semana=parseInt(v); updateHeader(); if(state.view==='producto') render(); else renderTienda(); }
+function onSem(v){ state.semana = (v==='all') ? 'all' : parseInt(v); updateHeader(); if(state.view==='producto') render(); else renderTienda(); }
 
 function updateHeader(){
-  // Fecha real del Excel según semana seleccionada
+  if(state.semana === 'all'){
+    var s0 = DATA.semanas[0], sN = DATA.semanas[DATA.semanas.length-1];
+    var f0 = (DATA.fecha_por_semana && (DATA.fecha_por_semana[String(s0)] || DATA.fecha_por_semana[s0])) || '—';
+    var fN = (DATA.fecha_por_semana && (DATA.fecha_por_semana[String(sN)] || DATA.fecha_por_semana[sN])) || '—';
+    document.getElementById('hdrFecha').textContent  = f0 + ' — ' + fN;
+    document.getElementById('hdrSem').textContent    = 'Global';
+    document.getElementById('hdrTienda').textContent = state.tienda;
+    document.getElementById('projTitle').textContent = 'Proyección';
+    return;
+  }
   var semKey = String(state.semana);
   var fecha = DATA.fecha_por_semana && DATA.fecha_por_semana[semKey]
     ? DATA.fecha_por_semana[semKey]
@@ -386,7 +405,7 @@ function updateHeader(){
 }
 
 function getD(){
-  var key = String(state.semana);
+  var key = state.semana === 'all' ? String(DATA.semanas[DATA.semanas.length-1]) : String(state.semana);
   return (DATA.data[state.tienda]&&DATA.data[state.tienda][key]) || {};
 }
 
@@ -440,56 +459,64 @@ function setView(v){
 
 function renderTienda(){
   var tiendas = DATA.tiendas;
-  var prods = DATA.productos;
   var key = String(state.semana);
-  
-  // TOP VENTA y TOP MERMA: totales reales acumulados (todas las fechas, sin doble conteo)
-  var totEmb_global=0,totV12_global=0,totMerma_global=0,totRetail_global=0;
-  var tiendaDataGlobal = [];
-  
+  var isAll = (state.semana === 'all');
+
+  // ── Obtener totales por tienda según si es global o semana específica ──
+  var totEmb=0, totCfbc=0, totMerma=0, totRetail=0;
+  var tiendaData = [];
+
   tiendas.forEach(function(tienda){
-    var tot = (DATA.totales_tienda && DATA.totales_tienda[tienda]) || {};
-    var emb_g    = tot.embarque_u || 0;
-    var v12_g    = tot.ventas_u   || 0;
-    var merma_g  = tot.merma_u    || 0;
-    var retail_g = tot.retail_vc  || 0;
-    totEmb_global    += emb_g;
-    totV12_global    += v12_g;
-    totMerma_global  += merma_g;
-    totRetail_global += retail_g;
-    tiendaDataGlobal.push({tienda:tienda, emb:emb_g, v12:v12_g, merma:merma_g, retail:retail_g});
+    var emb=0, cfbc=0, merma=0, retail=0;
+    if(isAll){
+      // Usar totales globales precalculados en Python
+      var tot = (DATA.totales_tienda && DATA.totales_tienda[tienda]) || {};
+      emb    = tot.embarque_u || 0;
+      cfbc   = tot.venta_cfbc || 0;
+      merma  = tot.merma_u    || 0;
+      retail = tot.retail_vc  || 0;
+    } else {
+      // Usar raw de la semana seleccionada
+      var raw = (DATA.raw_semana && DATA.raw_semana[tienda] && DATA.raw_semana[tienda][key]) || {};
+      emb    = raw.embarque_u || 0;
+      cfbc   = raw.venta_cfbc || 0;
+      merma  = raw.merma_u    || 0;
+      retail = raw.retail_vc  || 0;
+    }
+    totEmb+=emb; totCfbc+=cfbc; totMerma+=merma; totRetail+=retail;
+    tiendaData.push({tienda:tienda, emb:emb, cfbc:cfbc, merma:merma, retail:retail});
   });
+
+  // ── TOP VENTA: UNIDADES = Cntd Embarque | VENTA = Venta CFBC ──
+  var histRows='';
+  tiendaData.forEach(function(t){
+    var pct = totCfbc > 0 ? Math.round(t.cfbc/totCfbc*100) : 0;
+    histRows += '<tr><td>'+t.tienda+'</td><td>'+fmt(t.emb)+'</td><td>$'+fmt(t.cfbc)+'</td><td>'+pct+'%</td></tr>';
+  });
+  histRows += '<tr class="total"><td>Total</td><td>'+fmt(totEmb)+'</td><td>$'+fmt(totCfbc)+'</td><td>100%</td></tr>';
+
+  // ── TOP MERMA: UNIDADES = Cant VC Tienda | CANTIDAD = Retail VC Tienda ──
+  var mermaRows='';
+  tiendaData.forEach(function(t){
+    var pct_retail = totRetail > 0 ? Math.round(t.retail/totRetail*100) : 0;
+    mermaRows += '<tr><td>'+t.tienda+'</td><td class="'+(t.merma>0?'red':'')+'">'+fmt(t.merma)+'</td><td>$</td><td class="'+(t.retail>0?'red':'')+'">'+fmt(t.retail)+'</td><td class="'+(pct_retail>0?'red':'')+'">'+pct_retail+'%</td></tr>';
+  });
+  mermaRows += '<tr class="total"><td>Total</td><td class="red">'+fmt(totMerma)+'</td><td>$</td><td class="red">'+fmt(totRetail)+'</td><td class="red">100%</td></tr>';
   
-  // DATOS POR SEMANA ACTUAL para Venta Promedio y Comparación
-  var totAvg=0,totProj=0;
+  // ── Venta Promedio y Comparación: usar semana actual (o última si global) ──
+  var semKeyProd = isAll ? String(DATA.semanas[DATA.semanas.length-1]) : key;
+  var prods = DATA.productos;
+  var totAvg=0, totProj=0;
   var tiendaDataSem = [];
-  
   tiendas.forEach(function(tienda){
-    var v3t=0,avg3t=0,proj3t=0;
+    var v3t=0, avg3t=0, proj3t=0;
     prods.forEach(function(p){
-      var d = (DATA.data[tienda]&&DATA.data[tienda][key]&&DATA.data[tienda][key][p]) || {v3:0,avg:0,proj:0};
+      var d = (DATA.data[tienda]&&DATA.data[tienda][semKeyProd]&&DATA.data[tienda][semKeyProd][p]) || {v3:0,avg:0,proj:0};
       v3t+=d.v3||0; avg3t+=d.avg||0; proj3t+=d.proj||0;
     });
     totAvg+=avg3t; totProj+=proj3t;
     tiendaDataSem.push({tienda:tienda, v3:v3t, avg:avg3t, proj:proj3t});
   });
-  
-  // Generar filas para TOP VENTA (GLOBAL)
-  var histRows='';
-  tiendaDataGlobal.forEach(function(t){
-    var pct_venta = totV12_global > 0 ? Math.round(t.v12/totV12_global*100) : 0;
-    histRows  += '<tr><td>'+t.tienda+'</td><td>'+fmt(t.emb)+'</td><td>$ '+fmt(t.v12)+'</td><td>'+pct_venta+'%</td></tr>';
-  });
-  histRows  += '<tr class="total"><td>Total</td><td>'+fmt(totEmb_global)+'</td><td>$ '+fmt(totV12_global)+'</td><td>100%</td></tr>';
-  
-  // Generar filas para TOP MERMA (GLOBAL)
-  var mermaRows='';
-  tiendaDataGlobal.forEach(function(t){
-    var pct_retail = t.emb > 0 ? Math.round(t.retail/t.emb*100) : 0;
-    mermaRows += '<tr><td>'+t.tienda+'</td><td>'+fmt(t.merma)+'</td><td>$</td><td class="'+(t.retail>0?'red':'')+'">'+fmt(t.retail)+'</td><td class="'+(pct_retail>0?'red':'')+'">'+pct_retail+'%</td></tr>';
-  });
-  var pct_retail_total = totEmb_global > 0 ? Math.round(totRetail_global/totEmb_global*100) : 0;
-  mermaRows += '<tr class="total"><td>Total</td><td>'+fmt(totMerma_global)+'</td><td>$</td><td class="red">'+fmt(totRetail_global)+'</td><td class="red">'+pct_retail_total+'%</td></tr>';
   
   // Generar filas para Venta Promedio (datos de la semana actual)
   var avgRows='';
