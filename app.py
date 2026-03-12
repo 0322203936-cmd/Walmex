@@ -198,14 +198,35 @@ def cargar_datos(url: str = "") -> dict:
         raw_semana[r['tienda']][r['semana']]['merma_u']    += r['merma_u']
         raw_semana[r['tienda']][r['semana']]['retail_vc']  += r['retail_vc']
 
+    # ── Totales por PRODUCTO ────────────────────────────────────────────────────
+    # Global: todos las tiendas, todas las semanas
+    totales_producto = defaultdict(lambda: defaultdict(float))
+    # Por tienda: todas las semanas de esa tienda
+    totales_tienda_producto = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
+    # Por semana: todas las tiendas de esa semana
+    raw_semana_producto = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
+    # Por tienda+semana: raw sin rolling (para clic en tienda + semana específica)
+    raw_stp_prod = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(float))))
+
+    for r in records:
+        for field in ['embarque_u', 'venta_cfbc', 'merma_u', 'retail_vc']:
+            totales_producto[r['producto']][field]                              += r[field]
+            totales_tienda_producto[r['tienda']][r['producto']][field]          += r[field]
+            raw_semana_producto[r['semana']][r['producto']][field]              += r[field]
+            raw_stp_prod[r['tienda']][r['semana']][r['producto']][field]        += r[field]
+
     return {
-        'semanas':          semanas,
-        'tiendas':          tiendas,
-        'productos':        productos,
-        'fecha_por_semana': fecha_por_semana,
-        'data':             {t: {str(s): v for s, v in sv2.items()} for t, sv2 in result.items()},
-        'totales_tienda':   {t: dict(v) for t, v in totales_tienda.items()},
-        'raw_semana':       {t: {str(s): dict(v) for s, v in sv.items()} for t, sv in raw_semana.items()},
+        'semanas':               semanas,
+        'tiendas':               tiendas,
+        'productos':             productos,
+        'fecha_por_semana':      fecha_por_semana,
+        'data':                  {t: {str(s): v for s, v in sv2.items()} for t, sv2 in result.items()},
+        'totales_tienda':        {t: dict(v) for t, v in totales_tienda.items()},
+        'raw_semana':            {t: {str(s): dict(v) for s, v in sv.items()} for t, sv in raw_semana.items()},
+        'totales_producto':      {p: dict(v) for p, v in totales_producto.items()},
+        'totales_tienda_prod':   {t: {p: dict(v) for p, v in pv.items()} for t, pv in totales_tienda_producto.items()},
+        'raw_sem_prod':          {str(s): {p: dict(v) for p, v in pv.items()} for s, pv in raw_semana_producto.items()},
+        'raw_stp_prod':          {t: {str(s): {p: dict(v) for p, v in pv.items()} for s, pv in sv.items()} for t, sv in raw_stp_prod.items()},
     }
 
 try:
@@ -221,7 +242,7 @@ HTML = r"""<!DOCTYPE html>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#fff;font-family:Arial,sans-serif;font-size:12px;color:#111;overflow-y:auto}
+body{background:#fff;font-family:Arial,sans-serif;font-size:12px;color:#111}
 .hdr{display:flex;align-items:center;justify-content:space-between;padding:6px 16px 4px;border-bottom:1px solid #ccc}
 .wm-logo{display:flex;align-items:center;gap:4px}
 .wm-text{font-size:1.2rem;font-weight:700;color:#0071ce;letter-spacing:-0.5px}
@@ -254,6 +275,9 @@ table.t td:first-child{text-align:left;color:#111}
 table.t tr.total td{font-weight:700;border-top:1px solid #ddd;background:#f5f5f5}
 .red{color:#c00;font-weight:600}
 .bold{font-weight:700}
+.row-click{cursor:pointer}
+.row-click:hover td{background:#e8f0fe}
+.row-sel td{background:#cce0ff!important;font-weight:700}
 #viewTienda{overflow:visible}
 @media(max-width:1200px){
   .grid{grid-template-columns:1fr;gap:8px}
@@ -340,21 +364,21 @@ table.t tr.total td{font-weight:700;border-top:1px solid #ddd;background:#f5f5f5
       <tbody id="tMermaT"></tbody></table>
     </div>
     <div class="box">
-      <div class="box-hdr">Venta Promedio Semanal</div>
-      <table class="t"><thead><tr><th>Tienda</th><th></th></tr></thead>
-      <tbody id="tAvgT"></tbody></table>
+      <div class="box-hdr" id="titleVentaProd">Producto Venta — Todas las tiendas</div>
+      <table class="t"><thead><tr><th>Producto</th><th>UNIDADES</th><th>VENTA</th></tr></thead>
+      <tbody id="tVentaProd"></tbody></table>
     </div>
     <div class="box">
-      <div class="box-hdr">Comparacion Ultimas 3 Semanas</div>
-      <table class="t"><thead><tr><th>Tienda</th><th></th></tr></thead>
-      <tbody id="tProjT"></tbody></table>
+      <div class="box-hdr" id="titleMermaProd">Merma Producto — Todas las tiendas</div>
+      <table class="t"><thead><tr><th>Producto</th><th>UNIDADES</th><th>CANTIDAD</th></tr></thead>
+      <tbody id="tMermaProd"></tbody></table>
     </div>
   </div>
 </div>
 
 <script>
 var DATA = JSON.parse(atob('__DATA_JSON__'));
-var state = { semana: null, tienda: null, view: 'producto' };
+var state = { semana: null, tienda: null, view: 'producto', ventaTiendaSel: null, mermaTiendaSel: null };
 var DIAS  = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
 var MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 
@@ -394,7 +418,7 @@ function buildChips(){
 }
 
 function selTienda(t){ state.tienda=t; buildChips(); updateHeader(); if(state.view==='producto') render(); else renderTienda(); }
-function onSem(v){ state.semana = (v==='all') ? 'all' : parseInt(v); updateHeader(); if(state.view==='producto') render(); else renderTienda(); }
+function onSem(v){ state.semana = (v==='all') ? 'all' : parseInt(v); state.ventaTiendaSel=null; state.mermaTiendaSel=null; updateHeader(); if(state.view==='producto') render(); else renderTienda(); }
 
 function updateHeader(){
   if(state.semana === 'all'){
@@ -474,86 +498,136 @@ function setView(v){
   else render();
 }
 
+// ── Clic en fila de Top Venta → filtra tabla Producto Venta ──────────────────
+function selVentaTienda(t){
+  state.ventaTiendaSel = (state.ventaTiendaSel === t) ? null : t; // toggle
+  renderTienda();
+}
+// ── Clic en fila de Top Merma → filtra tabla Merma Producto ──────────────────
+function selMermaTienda(t){
+  state.mermaTiendaSel = (state.mermaTiendaSel === t) ? null : t; // toggle
+  renderTienda();
+}
+
+// ── Helper: obtener datos de producto según contexto ─────────────────────────
+function getProdData(tiendaSel, key, isAll){
+  var prods = DATA.productos;
+  return prods.map(function(p){
+    var emb=0, cfbc=0, merma=0, retail=0;
+    if(isAll){
+      if(tiendaSel){
+        // tienda específica, todas las semanas
+        var d = ((DATA.totales_tienda_prod||{})[tiendaSel]||{})[p] || {};
+        emb=d.embarque_u||0; cfbc=d.venta_cfbc||0; merma=d.merma_u||0; retail=d.retail_vc||0;
+      } else {
+        // todas las tiendas, todas las semanas
+        var d = (DATA.totales_producto||{})[p] || {};
+        emb=d.embarque_u||0; cfbc=d.venta_cfbc||0; merma=d.merma_u||0; retail=d.retail_vc||0;
+      }
+    } else {
+      if(tiendaSel){
+        // tienda específica, semana específica
+        var d = (((DATA.raw_stp_prod||{})[tiendaSel]||{})[key]||{})[p] || {};
+        emb=d.embarque_u||0; cfbc=d.venta_cfbc||0; merma=d.merma_u||0; retail=d.retail_vc||0;
+      } else {
+        // todas las tiendas, semana específica
+        var d = ((DATA.raw_sem_prod||{})[key]||{})[p] || {};
+        emb=d.embarque_u||0; cfbc=d.venta_cfbc||0; merma=d.merma_u||0; retail=d.retail_vc||0;
+      }
+    }
+    return {prod:p, emb:emb, cfbc:cfbc, merma:merma, retail:retail};
+  });
+}
+
 function renderTienda(){
   var tiendas = DATA.tiendas;
   var key = String(state.semana);
   var isAll = (state.semana === 'all');
 
-  // ── Obtener totales por tienda según si es global o semana específica ──
+  // ── Totales por tienda ────────────────────────────────────────────────────
   var totEmb=0, totCfbc=0, totMerma=0, totRetail=0;
   var tiendaData = [];
-
   tiendas.forEach(function(tienda){
     var emb=0, cfbc=0, merma=0, retail=0;
     if(isAll){
-      // Usar totales globales precalculados en Python
       var tot = (DATA.totales_tienda && DATA.totales_tienda[tienda]) || {};
-      emb    = tot.embarque_u || 0;
-      cfbc   = tot.venta_cfbc || 0;
-      merma  = tot.merma_u    || 0;
-      retail = tot.retail_vc  || 0;
+      emb=tot.embarque_u||0; cfbc=tot.venta_cfbc||0; merma=tot.merma_u||0; retail=tot.retail_vc||0;
     } else {
-      // Usar raw de la semana seleccionada
-      var raw = (DATA.raw_semana && DATA.raw_semana[tienda] && DATA.raw_semana[tienda][key]) || {};
-      emb    = raw.embarque_u || 0;
-      cfbc   = raw.venta_cfbc || 0;
-      merma  = raw.merma_u    || 0;
-      retail = raw.retail_vc  || 0;
+      var raw = ((DATA.raw_semana||{})[tienda]||{})[key] || {};
+      emb=raw.embarque_u||0; cfbc=raw.venta_cfbc||0; merma=raw.merma_u||0; retail=raw.retail_vc||0;
     }
     totEmb+=emb; totCfbc+=cfbc; totMerma+=merma; totRetail+=retail;
     tiendaData.push({tienda:tienda, emb:emb, cfbc:cfbc, merma:merma, retail:retail});
   });
 
-  // ── TOP VENTA: UNIDADES = Cntd Embarque | VENTA = Venta CFBC ──
+  // ── TOP VENTA: filas clickeables ─────────────────────────────────────────
   var histRows='';
   tiendaData.forEach(function(t){
     var pct = totCfbc > 0 ? Math.round(t.cfbc/totCfbc*100) : 0;
-    histRows += '<tr><td>'+t.tienda+'</td><td>'+fmt(t.emb)+'</td><td>$'+fmt(t.cfbc)+'</td><td>'+pct+'%</td></tr>';
+    var isSel = (state.ventaTiendaSel === t.tienda);
+    histRows += '<tr class="row-click'+(isSel?' row-sel':'')+'" onclick="selVentaTienda(''+t.tienda.replace(/'/g,"\'")+'')">'
+      +'<td>'+t.tienda+'</td><td>'+fmt(t.emb)+'</td><td>$'+fmt(t.cfbc)+'</td><td>'+pct+'%</td></tr>';
   });
   histRows += '<tr class="total"><td>Total</td><td>'+fmt(totEmb)+'</td><td>$'+fmt(totCfbc)+'</td><td>100%</td></tr>';
 
-  // ── TOP MERMA: UNIDADES = Cant VC Tienda | CANTIDAD = Retail VC Tienda ──
+  // ── TOP MERMA: filas clickeables ─────────────────────────────────────────
   var mermaRows='';
   tiendaData.forEach(function(t){
-    var pct_retail = totRetail > 0 ? Math.round(t.retail/totRetail*100) : 0;
-    mermaRows += '<tr><td>'+t.tienda+'</td><td class="'+(t.merma>0?'red':'')+'">'+fmt(t.merma)+'</td><td>$</td><td class="'+(t.retail>0?'red':'')+'">'+fmt(t.retail)+'</td><td class="'+(pct_retail>0?'red':'')+'">'+pct_retail+'%</td></tr>';
+    var pct = totRetail > 0 ? Math.round(t.retail/totRetail*100) : 0;
+    var isSel = (state.mermaTiendaSel === t.tienda);
+    mermaRows += '<tr class="row-click'+(isSel?' row-sel':'')+'" onclick="selMermaTienda(''+t.tienda.replace(/'/g,"\'")+'')">'
+      +'<td>'+t.tienda+'</td>'
+      +'<td class="'+(t.merma>0?'red':'')+'">'+fmt(t.merma)+'</td>'
+      +'<td>$</td>'
+      +'<td class="'+(t.retail>0?'red':'')+'">'+fmt(t.retail)+'</td>'
+      +'<td class="'+(pct>0?'red':'')+'">'+pct+'%</td></tr>';
   });
-  mermaRows += '<tr class="total"><td>Total</td><td class="red">'+fmt(totMerma)+'</td><td>$</td><td class="red">'+fmt(totRetail)+'</td><td class="red">100%</td></tr>';
-  
-  // ── Venta Promedio y Comparación: usar semana actual (o última si global) ──
-  var semKeyProd = isAll ? String(DATA.semanas[DATA.semanas.length-1]) : key;
-  var prods = DATA.productos;
-  var totAvg=0, totProj=0;
-  var tiendaDataSem = [];
-  tiendas.forEach(function(tienda){
-    var v3t=0, avg3t=0, proj3t=0;
-    prods.forEach(function(p){
-      var d = (DATA.data[tienda]&&DATA.data[tienda][semKeyProd]&&DATA.data[tienda][semKeyProd][p]) || {v3:0,avg:0,proj:0};
-      v3t+=d.v3||0; avg3t+=d.avg||0; proj3t+=d.proj||0;
-    });
-    totAvg+=avg3t; totProj+=proj3t;
-    tiendaDataSem.push({tienda:tienda, v3:v3t, avg:avg3t, proj:proj3t});
+  mermaRows += '<tr class="total"><td>Total</td>'
+    +'<td class="red">'+fmt(totMerma)+'</td><td>$</td>'
+    +'<td class="red">'+fmt(totRetail)+'</td><td class="red">100%</td></tr>';
+
+  // ── PRODUCTO VENTA (abajo-izq): responde al clic en Top Venta ────────────
+  var ventaTiendaSel = state.ventaTiendaSel;
+  var ventaLabel = ventaTiendaSel ? ventaTiendaSel : 'Todas las tiendas';
+  document.getElementById('titleVentaProd').textContent = 'Producto Venta — ' + ventaLabel;
+
+  var prodVentaData = getProdData(ventaTiendaSel, key, isAll);
+  var totPvEmb=0, totPvCfbc=0;
+  prodVentaData.forEach(function(d){ totPvEmb+=d.emb; totPvCfbc+=d.cfbc; });
+
+  var ventaRows='';
+  prodVentaData.forEach(function(d){
+    if(d.emb===0 && d.cfbc===0) return;
+    ventaRows += '<tr><td>'+d.prod.replace('BQT ','')+'</td>'
+      +'<td>'+fmt(d.emb)+'</td>'
+      +'<td>$'+fmt(d.cfbc)+'</td></tr>';
   });
-  
-  // Generar filas para Venta Promedio (datos de la semana actual)
-  var avgRows='';
-  tiendaDataSem.forEach(function(t){
-    var avg_semanal = t.v3 / 3;
-    avgRows   += '<tr><td>'+t.tienda+'</td><td>'+Math.round(avg_semanal)+'</td></tr>';
+  ventaRows += '<tr class="total"><td>Total</td><td>'+fmt(totPvEmb)+'</td><td>$'+fmt(totPvCfbc)+'</td></tr>';
+
+  // ── MERMA PRODUCTO (abajo-der): responde al clic en Top Merma ────────────
+  var mermaTiendaSel = state.mermaTiendaSel;
+  var mermaLabel = mermaTiendaSel ? mermaTiendaSel : 'Todas las tiendas';
+  document.getElementById('titleMermaProd').textContent = 'Merma Producto — ' + mermaLabel;
+
+  var prodMermaData = getProdData(mermaTiendaSel, key, isAll);
+  var totPmMerma=0, totPmRetail=0;
+  prodMermaData.forEach(function(d){ totPmMerma+=d.merma; totPmRetail+=d.retail; });
+
+  var mermaRowsProd='';
+  prodMermaData.forEach(function(d){
+    if(d.merma===0 && d.retail===0) return;
+    mermaRowsProd += '<tr><td>'+d.prod.replace('BQT ','')+'</td>'
+      +'<td class="'+(d.merma>0?'red':'')+'">'+fmt(d.merma)+'</td>'
+      +'<td class="'+(d.retail>0?'red':'')+'">$'+fmt(d.retail)+'</td></tr>';
   });
-  avgRows   += '<tr class="total"><td>Total</td><td>'+Math.round(totAvg/tiendas.length)+'</td></tr>';
-  
-  // Generar filas para Comparación (datos de la semana actual)
-  var projRows='';
-  tiendaDataSem.forEach(function(t){
-    projRows  += '<tr><td>'+t.tienda+'</td><td class="bold">'+fmt(t.proj)+'</td></tr>';
-  });
-  projRows  += '<tr class="total"><td>Total</td><td>'+fmt(totProj)+'</td></tr>';
-  
-  document.getElementById('tHistT').innerHTML  = histRows;
-  document.getElementById('tMermaT').innerHTML = mermaRows;
-  document.getElementById('tAvgT').innerHTML   = avgRows;
-  document.getElementById('tProjT').innerHTML  = projRows;
+  mermaRowsProd += '<tr class="total"><td>Total</td>'
+    +'<td class="red">'+fmt(totPmMerma)+'</td>'
+    +'<td class="red">$'+fmt(totPmRetail)+'</td></tr>';
+
+  document.getElementById('tHistT').innerHTML    = histRows;
+  document.getElementById('tMermaT').innerHTML   = mermaRows;
+  document.getElementById('tVentaProd').innerHTML = ventaRows;
+  document.getElementById('tMermaProd').innerHTML = mermaRowsProd;
 }
 
 // ─── IMPRIMIR ───────────────────────────────────────────────────────────────
@@ -653,17 +727,6 @@ function imprimirReporte(){
 
 window.addEventListener('load', init);
 
-// Auto-ajustar altura del iframe al contenido real
-function resizeParent(){
-  try {
-    var h = document.documentElement.scrollHeight || document.body.scrollHeight;
-    window.parent.postMessage({isStreamlitMessage:true, type:'streamlit:setFrameHeight', height:h+20}, '*');
-  } catch(e){}
-}
-var _ro = new ResizeObserver(resizeParent);
-_ro.observe(document.body);
-window.addEventListener('load', resizeParent);
-
 (function fixParent(){
   try {
     var p = window.parent.document;
@@ -708,4 +771,4 @@ def build_html():
     ).decode('ascii')
     return HTML.replace('__DATA_JSON__', data_json)
 
-components.html(build_html(), height=1600, scrolling=True)
+components.html(build_html(), height=980, scrolling=False)
