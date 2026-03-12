@@ -304,6 +304,33 @@ function render(){
 }
 
 window.addEventListener('load', init);
+
+// Eliminar padding del frame padre de Streamlit
+(function fixParent(){
+  try {
+    var p = window.parent.document;
+    var style = p.createElement('style');
+    style.textContent = [
+      '.main .block-container{padding:0!important;margin:0!important}',
+      '.main{padding:0!important}',
+      '[data-testid="stAppViewContainer"]{padding:0!important}',
+      '[data-testid="stVerticalBlock"]{gap:0!important}',
+      'header,[data-testid="stToolbar"],[data-testid="stDecoration"]{display:none!important}',
+      'iframe{margin:0!important}',
+      'section[data-testid="stMain"]{padding:0!important}',
+      '.stMainBlockContainer{padding:0!important}',
+    ].join('');
+    p.head.appendChild(style);
+  } catch(e){}
+  // Resize iframe to full viewport
+  try {
+    var frames = window.parent.document.querySelectorAll('iframe');
+    frames.forEach(function(f){
+      f.style.height = window.parent.innerHeight + 'px';
+      f.style.width  = '100%';
+    });
+  } catch(e){}
+})();
 </script>
 </body>
 </html>"""
