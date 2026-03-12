@@ -45,17 +45,41 @@ def cargar_datos(url: str) -> dict:
         try: return float(v) if v is not None else 0.0
         except: return 0.0
 
+    # Mapear columnas por nombre de encabezado — fila 1
+    headers = [str(c.value).strip() if c.value else '' for c in ws[1]]
+    def col(name):
+        for i, h in enumerate(headers):
+            if h == name: return i
+        raise ValueError(f'Columna "{name}" no encontrada. Encabezados: {headers}')
+
+    idx_producto = col('Desc Art 1')
+    idx_tienda   = col('Nombre Tienda/Club')
+    idx_semana   = col('SEM')
+    idx_fecha    = col('Diario')
+    idx_ventas   = col('Venta POS')
+    idx_embarque = col('Cntd Embarque')
+
     records = []
     for row in ws.iter_rows(min_row=2, values_only=True):
-        producto = str(row[3]).strip() if row[3] else None
-        tienda   = str(row[15]).strip() if row[15] else None
-        semana   = int(row[25]) if row[25] else None
+        producto  = str(row[idx_producto]).strip() if row[idx_producto] else None
+        tienda    = str(row[idx_tienda]).strip()   if row[idx_tienda]   else None
+        semana    = int(row[idx_semana])            if row[idx_semana]   else None
+        fecha_raw = row[idx_fecha]
+        if hasattr(fecha_raw, 'strftime'):
+            fecha = fecha_raw.strftime('%d/%m/%Y')
+        elif fecha_raw:
+            fecha = str(fecha_raw).strip()
+        else:
+            fecha = ''
         if not producto or not tienda or not semana: continue
         records.append({
-            'producto': producto, 'tienda': tienda, 'semana': semana,
-            'ventas_u': sv(row[18]),
-            'embarque_u': sv(row[20]),
-            'merma_u': max(0.0, sv(row[20]) - sv(row[18])),
+            'producto':   producto,
+            'tienda':     tienda,
+            'semana':     semana,
+            'fecha':      fecha,
+            'ventas_u':   sv(row[idx_ventas]),
+            'embarque_u': sv(row[idx_embarque]),
+            'merma_u':    max(0.0, sv(row[idx_embarque]) - sv(row[idx_ventas])),
         })
 
     semanas   = sorted(set(r['semana'] for r in records))
@@ -67,6 +91,12 @@ def cargar_datos(url: str) -> dict:
         by_stp[r['semana']][r['tienda']][r['producto']]['ventas_u']   += r['ventas_u']
         by_stp[r['semana']][r['tienda']][r['producto']]['embarque_u'] += r['embarque_u']
         by_stp[r['semana']][r['tienda']][r['producto']]['merma_u']    += r['merma_u']
+
+    # Fecha real del Excel por semana
+    fecha_por_semana = {}
+    for r in records:
+        if r['fecha']:
+            fecha_por_semana[r['semana']] = r['fecha']
 
     result = {}
     for t in tiendas:
@@ -91,9 +121,10 @@ def cargar_datos(url: str) -> dict:
             result[t][s] = prod_data
 
     return {
-        'semanas':   semanas,
-        'tiendas':   tiendas,
-        'productos': productos,
+        'semanas':          semanas,
+        'tiendas':          tiendas,
+        'productos':        productos,
+        'fecha_por_semana': fecha_por_semana,
         'data': {t: {str(s): v for s, v in sv2.items()} for t, sv2 in result.items()},
     }
 
@@ -243,9 +274,13 @@ function selTienda(t){ state.tienda=t; buildChips(); updateHeader(); render(); }
 function onSem(v){ state.semana=parseInt(v); updateHeader(); render(); }
 
 function updateHeader(){
-  var now  = new Date();
-  var dia  = DIAS[now.getDay()];
-  var fecha = dia.charAt(0).toUpperCase()+dia.slice(1)+', '+now.getDate()+' de '+MESES[now.getMonth()]+' de '+now.getFullYear();
+  // Fecha real del Excel según semana seleccionada
+  var semKey = String(state.semana);
+  var fecha = DATA.fecha_por_semana && DATA.fecha_por_semana[semKey]
+    ? DATA.fecha_por_semana[semKey]
+    : DATA.fecha_por_semana && DATA.fecha_por_semana[state.semana]
+    ? DATA.fecha_por_semana[state.semana]
+    : '—';
   document.getElementById('hdrFecha').textContent   = fecha;
   document.getElementById('hdrSem').textContent     = state.semana%100;
   document.getElementById('hdrTienda').textContent  = state.tienda;
