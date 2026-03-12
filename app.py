@@ -39,7 +39,7 @@ def cargar_datos(url: str = "") -> dict:
     excel_path = next((p for p in paths if Path(p).exists()), None)
     if not excel_path:
         raise FileNotFoundError("No se encontró Analisis_Walmart.xlsx. Súbelo al repo de GitHub.")
-    wb = openpyxl.load_workbook(excel_path, data_only=True)
+    wb = openpyxl.load_workbook(excel_path, data_only=True, read_only=True)
     ws = wb['Data']
 
     def sv(v):
@@ -99,7 +99,6 @@ def cargar_datos(url: str = "") -> dict:
             semana_num = None
 
         # Fecha: puede venir como datetime o string MM/DD/YYYY
-        from datetime import datetime as _dt
         fecha_raw = row[idx_fecha]
         anio = None
         if hasattr(fecha_raw, 'strftime'):
@@ -136,6 +135,7 @@ def cargar_datos(url: str = "") -> dict:
             'retail_vc':  sv(row[idx_retail_vc]) if idx_retail_vc is not None else 0,   # Retail VC Tienda
         })
 
+    wb.close()
     semanas   = sorted(set(r['semana'] for r in records))
     tiendas   = sorted(set(r['tienda']  for r in records))
     productos = sorted(set(r['producto'] for r in records))
