@@ -204,6 +204,7 @@ table.t td:first-child{text-align:left;color:#111}
 table.t tr.total td{font-weight:700;border-top:1px solid #ddd;background:#f5f5f5}
 .red{color:#c00;font-weight:600}
 .bold{font-weight:700}
+#viewTienda .box{max-height:400px;overflow-y:auto}
 @media(max-width:1200px){
   .grid{grid-template-columns:1fr;gap:8px}
   .box{overflow-y:auto;max-height:500px}
