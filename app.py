@@ -222,7 +222,7 @@ table.t tr.total td{font-weight:700;border-top:1px solid #ddd;background:#f5f5f5
 .red{color:#c00;font-weight:600}
 .bold{font-weight:700}
 #viewTienda{overflow-y:auto;max-height:calc(100vh - 180px)}
-#viewTienda .box{overflow-y:auto}
+#viewTienda .box{overflow:visible}
 @media(max-width:1200px){
   .grid{grid-template-columns:1fr;gap:8px}
   .box{overflow-y:auto;max-height:500px}
