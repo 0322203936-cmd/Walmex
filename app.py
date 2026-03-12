@@ -131,27 +131,18 @@ def cargar_datos(url: str = "") -> dict:
             last3  = semanas[max(0, idx-2):idx+1]
             prod_data = {}
             for p in productos:
-                v12  = sum(by_stp[sem][t][p]['ventas_u']  for sem in last12)
-                v3   = sum(by_stp[sem][t][p]['ventas_u']  for sem in last3)
-                emb  = by_stp[s][t][p]['embarque_u']
-                m3   = sum(by_stp[sem][t][p]['merma_u']   for sem in last3)
+                v12  = sum(by_stp[sem][t][p]['ventas_u']   for sem in last12)
+                v3   = sum(by_stp[sem][t][p]['ventas_u']   for sem in last3)
+                emb3 = sum(by_stp[sem][t][p]['embarque_u'] for sem in last3)  # embarque 3 semanas
+                m3   = max(0, emb3 - v3)  # merma = embarque3 - ventas3
                 avg  = v12 / len(last12) if last12 else 0
                 prod_data[p] = {
                     'v12': round(v12), 'v3': round(v3),
-                    'emb': round(emb), 'm3': round(m3),
+                    'emb': round(emb3), 'm3': round(m3),
                     'avg': round(avg, 1), 'proj': round(avg),
-                    'pct_merma': round(m3/emb*100) if emb > 0 else 0,
+                    'pct_merma': round(m3/emb3*100) if emb3 > 0 else 0,
                 }
             result[t][s] = prod_data
-
-    # DEBUG — mostrar en logs qué semanas y fechas se encontraron
-    import sys
-    print(f"SEMANAS ENCONTRADAS: {semanas}", file=sys.stderr)
-    print(f"TOTAL REGISTROS: {len(records)}", file=sys.stderr)
-    print(f"FECHAS POR SEMANA: {fecha_por_semana}", file=sys.stderr)
-    # Muestra los primeros 5 valores crudos de SEM y Diario
-    for i, row in enumerate(ws.iter_rows(min_row=2, max_row=6, values_only=True)):
-        print(f"  fila {i+2}: SEM={row[idx_semana]!r}  Diario={row[idx_fecha]!r}", file=sys.stderr)
 
     return {
         'semanas':          semanas,
