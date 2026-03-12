@@ -59,6 +59,7 @@ def cargar_datos(url: str = "") -> dict:
     idx_fecha    = col('Diario')
     idx_ventas   = col('Cnt POS')       # Unidades vendidas (Cnt POS)
     idx_embarque = col('Cntd Embarque') # Unidades embarcadas
+    idx_merma_vc = col('Cant VC Tienda') # Merma (Cant VC Tienda)
 
     records = []
     for row in ws.iter_rows(min_row=2, values_only=True):
@@ -103,7 +104,7 @@ def cargar_datos(url: str = "") -> dict:
             'fecha':      fecha,
             'ventas_u':   sv(row[idx_ventas]),
             'embarque_u': sv(row[idx_embarque]),
-            'merma_u':    max(0.0, sv(row[idx_embarque]) - sv(row[idx_ventas])),
+            'merma_u':    sv(row[idx_merma_vc]),  # Tomar directamente de Cant VC Tienda
         })
 
     semanas   = sorted(set(r['semana'] for r in records))
@@ -134,7 +135,7 @@ def cargar_datos(url: str = "") -> dict:
                 v12  = sum(by_stp[sem][t][p]['ventas_u']   for sem in last12)
                 v3   = sum(by_stp[sem][t][p]['ventas_u']   for sem in last3)
                 emb3 = sum(by_stp[sem][t][p]['embarque_u'] for sem in last3)  # embarque 3 semanas
-                m3   = max(0, emb3 - v3)  # merma = embarque3 - ventas3
+                m3   = sum(by_stp[sem][t][p]['merma_u']    for sem in last3)  # merma 3 semanas (Cant VC Tienda)
                 avg  = v12 / len(last12) if last12 else 0
                 prod_data[p] = {
                     'v12': round(v12), 'v3': round(v3),
