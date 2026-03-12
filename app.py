@@ -137,10 +137,15 @@ def cargar_datos(url: str = "") -> dict:
                 emb3 = sum(by_stp[sem][t][p]['embarque_u'] for sem in last3)  # embarque 3 semanas
                 m3   = sum(by_stp[sem][t][p]['merma_u']    for sem in last3)  # merma 3 semanas (Cant VC Tienda)
                 avg  = v3 / len(last3) if last3 else 0  # Promedio = 3 semanas / 3
+                
+                # Proyección = Venta Promedio / (1 - Índice Merma %)
+                merma_ratio = m3 / emb3 if emb3 > 0 else 0  # Ratio de merma como decimal
+                proj = avg / (1 - merma_ratio) if merma_ratio < 1 else avg  # Evitar división por cero
+                
                 prod_data[p] = {
                     'v12': round(v12), 'v3': round(v3),
                     'emb': round(emb3), 'm3': round(m3),
-                    'avg': round(avg, 1), 'proj': round(avg),
+                    'avg': round(avg, 1), 'proj': round(proj),
                     'pct_merma': round(m3/emb3*100) if emb3 > 0 else 0,
                 }
             result[t][s] = prod_data
