@@ -133,9 +133,9 @@ select{border:1px solid #bbb;border-radius:4px;padding:3px 7px;font-size:.72rem;
 table.t{width:100%;border-collapse:collapse}
 table.t th{padding:3px 10px;font-size:.67rem;font-weight:700;color:#333;border-bottom:1px solid #ccc;text-align:right;white-space:nowrap;background:#fafafa}
 table.t th:first-child{text-align:left}
-table.t td{padding:2px 10px;font-size:.72rem;border-bottom:1px solid #eee;text-align:right;color:#222;white-space:nowrap}
+table.t td{padding:2px 10px;font-size:.72rem;border-bottom:none;text-align:right;color:#222;white-space:nowrap}
 table.t td:first-child{text-align:left;color:#111}
-table.t tr.total td{font-weight:700;border-top:1.5px solid #bbb;background:#f5f5f5}
+table.t tr.total td{font-weight:700;border-top:1px solid #ddd;background:#f5f5f5}
 table.t tr:hover:not(.total) td{background:#f0f7ff}
 .red{color:#c00;font-weight:600}
 .bold{font-weight:700}
