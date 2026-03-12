@@ -272,12 +272,12 @@ table.t tr:hover:not(.total) td{background:#f0f7ff}
 
   <div class="grid" id="viewTienda" style="display:none">
     <div class="box">
-      <div class="box-hdr">Ventas Históricas</div>
+      <div class="box-hdr">Top Venta</div>
       <table class="t"><thead><tr><th>Tienda</th><th>12 Semanas</th><th>3 Semanas</th></tr></thead>
       <tbody id="tHistT"></tbody></table>
     </div>
     <div class="box">
-      <div class="box-hdr">Índice de Merma por Artículo Últimas 3 Semanas</div>
+      <div class="box-hdr">Top Merma</div>
       <table class="t"><thead><tr><th>Tienda</th><th>Embarque</th><th>Merma</th><th>Merma %</th></tr></thead>
       <tbody id="tMermaT"></tbody></table>
     </div>
@@ -287,7 +287,7 @@ table.t tr:hover:not(.total) td{background:#f0f7ff}
       <tbody id="tAvgT"></tbody></table>
     </div>
     <div class="box">
-      <div class="box-hdr" id="projTitleT">Proyección Semana Siguiente</div>
+      <div class="box-hdr">Comparacion Ultimas 3 Semanas</div>
       <table class="t"><thead><tr><th>Tienda</th><th>Proyección</th></tr></thead>
       <tbody id="tProjT"></tbody></table>
     </div>
