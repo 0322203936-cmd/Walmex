@@ -167,12 +167,22 @@ def cargar_datos(url: str = "") -> dict:
                 }
             result[t][s] = prod_data
 
+    # Totales crudos acumulados por tienda (TODAS las fechas, sin ventanas deslizantes)
+    totales_tienda = defaultdict(lambda: defaultdict(float))
+    for r in records:
+        totales_tienda[r['tienda']]['ventas_u']   += r['ventas_u']
+        totales_tienda[r['tienda']]['merma_u']    += r['merma_u']
+        totales_tienda[r['tienda']]['embarque_u'] += r['embarque_u']
+        totales_tienda[r['tienda']]['venta_cfbc'] += r['venta_cfbc']
+        totales_tienda[r['tienda']]['retail_vc']  += r['retail_vc']
+
     return {
         'semanas':          semanas,
         'tiendas':          tiendas,
         'productos':        productos,
         'fecha_por_semana': fecha_por_semana,
         'data': {t: {str(s): v for s, v in sv2.items()} for t, sv2 in result.items()},
+        'totales_tienda':   {t: dict(v) for t, v in totales_tienda.items()},
     }
 
 try:
@@ -433,27 +443,20 @@ function renderTienda(){
   var prods = DATA.productos;
   var key = String(state.semana);
   
-  // TOP VENTA y TOP MERMA: SIEMPRE GLOBALES (todas las fechas, todas las tiendas)
+  // TOP VENTA y TOP MERMA: totales reales acumulados (todas las fechas, sin doble conteo)
   var totEmb_global=0,totV12_global=0,totMerma_global=0,totRetail_global=0;
   var tiendaDataGlobal = [];
   
   tiendas.forEach(function(tienda){
-    var emb_g=0,v12_g=0,merma_g=0,retail_g=0;
-    for(var semIdx=0; semIdx<DATA.semanas.length; semIdx++){
-      var sem = DATA.semanas[semIdx];
-      var semKey = String(sem);
-      for(var pIdx=0; pIdx<prods.length; pIdx++){
-        var p = prods[pIdx];
-        if(DATA.data[tienda]&&DATA.data[tienda][semKey]&&DATA.data[tienda][semKey][p]){
-          var d = DATA.data[tienda][semKey][p];
-          emb_g += (d.emb||0);
-          v12_g += (d.v12||0);
-          merma_g += (d.m3||0);
-          retail_g += (d.retail||0);
-        }
-      }
-    }
-    totEmb_global+=emb_g; totV12_global+=v12_g; totMerma_global+=merma_g; totRetail_global+=retail_g;
+    var tot = (DATA.totales_tienda && DATA.totales_tienda[tienda]) || {};
+    var emb_g    = tot.embarque_u || 0;
+    var v12_g    = tot.ventas_u   || 0;
+    var merma_g  = tot.merma_u    || 0;
+    var retail_g = tot.retail_vc  || 0;
+    totEmb_global    += emb_g;
+    totV12_global    += v12_g;
+    totMerma_global  += merma_g;
+    totRetail_global += retail_g;
     tiendaDataGlobal.push({tienda:tienda, emb:emb_g, v12:v12_g, merma:merma_g, retail:retail_g});
   });
   
