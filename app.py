@@ -221,7 +221,7 @@ HTML = r"""<!DOCTYPE html>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#fff;font-family:Arial,sans-serif;font-size:12px;color:#111}
+body{background:#fff;font-family:Arial,sans-serif;font-size:12px;color:#111;overflow-y:auto}
 .hdr{display:flex;align-items:center;justify-content:space-between;padding:6px 16px 4px;border-bottom:1px solid #ccc}
 .wm-logo{display:flex;align-items:center;gap:4px}
 .wm-text{font-size:1.2rem;font-weight:700;color:#0071ce;letter-spacing:-0.5px}
@@ -653,6 +653,17 @@ function imprimirReporte(){
 
 window.addEventListener('load', init);
 
+// Auto-ajustar altura del iframe al contenido real
+function resizeParent(){
+  try {
+    var h = document.documentElement.scrollHeight || document.body.scrollHeight;
+    window.parent.postMessage({isStreamlitMessage:true, type:'streamlit:setFrameHeight', height:h+20}, '*');
+  } catch(e){}
+}
+var _ro = new ResizeObserver(resizeParent);
+_ro.observe(document.body);
+window.addEventListener('load', resizeParent);
+
 (function fixParent(){
   try {
     var p = window.parent.document;
@@ -697,4 +708,4 @@ def build_html():
     ).decode('ascii')
     return HTML.replace('__DATA_JSON__', data_json)
 
-components.html(build_html(), height=980, scrolling=False)
+components.html(build_html(), height=1600, scrolling=True)
