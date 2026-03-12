@@ -33,12 +33,57 @@ iframe { display: block !important; margin: 0 !important; border: none !importan
 </style>
 """, unsafe_allow_html=True)
 
+def get_sharepoint_file() -> bytes:
+    import requests, io
+    tenant_id    = st.secrets["TENANT_ID"]
+    client_id    = st.secrets["CLIENT_ID"]
+    client_secret= st.secrets["CLIENT_SECRET"]
+
+    # 1. Obtener token de acceso
+    token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
+    token_resp = requests.post(token_url, data={
+        "grant_type":    "client_credentials",
+        "client_id":     client_id,
+        "client_secret": client_secret,
+        "scope":         "https://graph.microsoft.com/.default",
+    })
+    token_resp.raise_for_status()
+    access_token = token_resp.json()["access_token"]
+
+    headers = {"Authorization": f"Bearer {access_token}"}
+
+    # 2. Obtener el site ID
+    site_resp = requests.get(
+        "https://graph.microsoft.com/v1.0/sites/pacificafarms.sharepoint.com:/sites/requerimientovsproyeccion",
+        headers=headers
+    )
+    site_resp.raise_for_status()
+    site_id = site_resp.json()["id"]
+
+    # 3. Buscar el archivo en el drive
+    search_resp = requests.get(
+        f"https://graph.microsoft.com/v1.0/sites/{site_id}/drive/root/search(q='Analisis Walmart.xlsx')",
+        headers=headers
+    )
+    search_resp.raise_for_status()
+    items = search_resp.json().get("value", [])
+    if not items:
+        raise FileNotFoundError("No se encontró Analisis Walmart.xlsx en SharePoint")
+    item_id = items[0]["id"]
+
+    # 4. Descargar el archivo
+    dl_resp = requests.get(
+        f"https://graph.microsoft.com/v1.0/sites/{site_id}/drive/items/{item_id}/content",
+        headers=headers
+    )
+    dl_resp.raise_for_status()
+    return dl_resp.content
+
 @st.cache_data(ttl=60, show_spinner=False)
 def cargar_datos(url: str) -> dict:
-    import io, requests
-    resp = requests.get(url)
-    resp.raise_for_status()
-    wb = openpyxl.load_workbook(io.BytesIO(resp.content), data_only=True)
+    import io
+    file_bytes = get_sharepoint_file()
+    wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
     ws = wb['Data']
 
     def sv(v):
@@ -493,4 +538,3 @@ def build_html():
     return HTML.replace('__DATA_JSON__', data_json)
 
 components.html(build_html(), height=980, scrolling=False)
-
