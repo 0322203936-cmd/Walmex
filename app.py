@@ -10,12 +10,24 @@ import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Walmex · CFBC", layout="wide", initial_sidebar_state="collapsed")
 st.markdown("""<style>
-header,footer,[data-testid='stToolbar'],[data-testid='stDecoration']{display:none!important}
-section[data-testid='stSidebar']{display:none!important}
-.main .block-container{padding:0!important;max-width:100%!important}
-.main{padding:0!important}
-#root > div:first-child{padding:0!important}
-iframe{display:block}
+/* Eliminar TODO el padding/margin de Streamlit */
+header, footer, [data-testid='stToolbar'], [data-testid='stDecoration'],
+[data-testid='stStatusWidget'] { display:none !important; visibility:hidden !important; height:0 !important; }
+section[data-testid='stSidebar'] { display:none !important; }
+.main .block-container {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+}
+.main { padding: 0 !important; overflow: hidden !important; }
+.stApp { margin: 0 !important; }
+[data-testid='stAppViewContainer'] { padding: 0 !important; margin: 0 !important; }
+[data-testid='stVerticalBlock'] { gap: 0 !important; padding: 0 !important; }
+div[data-testid='stHtml'] { padding: 0 !important; margin: 0 !important; line-height: 0 !important; }
+iframe { display: block !important; margin: 0 !important; border: none !important; }
 </style>""", unsafe_allow_html=True)
 
 @st.cache_data(ttl=3600)
