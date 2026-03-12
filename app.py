@@ -12,7 +12,7 @@ st.set_page_config(page_title="Walmex · CFBC", layout="wide", initial_sidebar_s
 
 st.markdown("""
 <style>
-/* Eliminar padding/margin de Streamlit */
+/* 1. Eliminar padding/margin general */
 .main .block-container {
     padding: 0 !important;
     max-width: 100% !important;
@@ -21,7 +21,7 @@ st.markdown("""
 .main { padding: 0 !important; overflow: hidden !important; }
 .stApp { margin: 0 !important; }
 
-/* Ocultar barra superior, menú, sidebar y footer de Streamlit */
+/* 2. Ocultar interfaz nativa de Streamlit */
 [data-testid="stHeader"],
 [data-testid="stSidebar"],
 [data-testid="stToolbar"],
@@ -32,23 +32,24 @@ header,
 footer { 
     display: none !important; 
     visibility: hidden !important; 
+    height: 0 !important;
 }
 
-/* Ocultar botón de Manage App y marca de agua de Streamlit Cloud */
-div[class^="viewerBadge"],
-div[class^="styles_viewerBadge"],
-.viewerBadge_container__r5tak,
-.styles_viewerBadge__CvC9N,
-a[href^="https://streamlit.io/cloud"],
-a[href="https://streamlit.io"],
-[data-testid="stBottom"],
-[data-testid="stActionButtonIcon"],
-.stActionButton { 
-    display: none !important; 
-    visibility: hidden !important; 
+/* 3. OPCIÓN NUCLEAR PARA LA MARCA DE AGUA Y BOTONES */
+.stDeployButton { display: none !important; }
+
+/* Ocultar por atributos de posición (esquina inferior derecha) */
+div[style*="bottom: 1.5rem"], 
+div[style*="bottom: 15px"],
+div[style*="position: fixed"][style*="bottom"][style*="right"],
+iframe[src*="badge"] {
+    display: none !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
 }
 
-/* Reducir gaps en bloques verticales */
+/* Reducir gaps en tu iframe */
 [data-testid='stVerticalBlock'] { gap: 0 !important; padding: 0 !important; }
 div[data-testid='stHtml'] { padding: 0 !important; margin: 0 !important; line-height: 0 !important; }
 iframe { display: block !important; margin: 0 !important; border: none !important; }
