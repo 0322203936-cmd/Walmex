@@ -245,7 +245,7 @@ table.t tr:hover:not(.total) td{background:#f0f7ff}
     </div>
     <div class="box">
       <div class="box-hdr">Índice de Merma por Artículo Últimas 3 Semanas</div>
-      <table class="t"><thead><tr><th>Producto</th><th>Embarque</th><th>Merma %</th></tr></thead>
+      <table class="t"><thead><tr><th>Producto</th><th>Embarque</th><th>Merma</th><th>Merma %</th></tr></thead>
       <tbody id="tMerma"></tbody></table>
     </div>
     <div class="box">
@@ -331,13 +331,13 @@ function render(){
     var name = p.replace('BQT ','');
     totV12+=v.v12; totV3+=v.v3; totEmb+=v.emb; totM3+=v.m3; totAvg+=v.avg; totProj+=v.proj; totEmb2+=v.emb;
     histRows  += '<tr><td>'+name+'</td><td>'+fmt(v.v12)+'</td><td>'+fmt(v.v3)+'</td></tr>';
-    mermaRows += '<tr><td>'+name+'</td><td>'+fmt(v.emb)+'</td><td class="'+(v.pct_merma>0?'red':'')+'">'+v.pct_merma+'%</td></tr>';
+    mermaRows += '<tr><td>'+name+'</td><td>'+fmt(v.emb)+'</td><td class="'+(v.m3>0?'red':'')+'">'+fmt(v.m3)+'</td><td class="'+(v.pct_merma>0?'red':'')+'">'+v.pct_merma+'%</td></tr>';
     avgRows   += '<tr><td>'+name+'</td><td>'+Math.round(v.avg)+'</td></tr>';
     projRows  += '<tr><td>'+name+'</td><td class="bold">'+fmt(v.proj)+'</td></tr>';
   });
   histRows  += '<tr class="total"><td>Total</td><td>'+fmt(totV12)+'</td><td>'+fmt(totV3)+'</td></tr>';
   var pct_merma_total = totEmb2 > 0 ? Math.round(totM3/totEmb2*100) : 0;
-  mermaRows += '<tr class="total"><td>Total</td><td>'+fmt(totEmb)+'</td><td class="red">'+pct_merma_total+'%</td></tr>';
+  mermaRows += '<tr class="total"><td>Total</td><td>'+fmt(totEmb)+'</td><td class="red">'+fmt(totM3)+'</td><td class="red">'+pct_merma_total+'%</td></tr>';
   avgRows   += '<tr class="total"><td>Total</td><td>'+Math.round(totAvg)+'</td></tr>';
   projRows  += '<tr class="total"><td>Total</td><td>'+fmt(totProj)+'</td></tr>';
   document.getElementById('tHist').innerHTML  = histRows;
@@ -415,7 +415,7 @@ function imprimirReporte(){
     +     '<table><thead><tr><th>Producto</th><th>12 Semanas</th><th>3 Semanas</th></tr></thead>'
     +     '<tbody>'+tHist+'</tbody></table></div>'
     +   '<div class="box"><div class="box-hdr">\u00cdndice de Merma por Art\u00edculo \u00daltimas 3 Semanas</div>'
-    +     '<table><thead><tr><th>Producto</th><th>Embarque</th><th>Merma %</th></tr></thead>'
+    +     '<table><thead><tr><th>Producto</th><th>Embarque</th><th>Merma</th><th>Merma %</th></tr></thead>'
     +     '<tbody>'+tMerma+'</tbody></table></div>'
     +   '<div class="box"><div class="box-hdr">Venta Promedio Semanal</div>'
     +     '<table><thead><tr><th>Producto</th><th>Promedio</th></tr></thead>'
