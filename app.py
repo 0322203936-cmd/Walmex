@@ -57,8 +57,8 @@ def cargar_datos(url: str = "") -> dict:
     idx_tienda   = col('Nombre Tienda/Club')
     idx_semana   = col('SEM')
     idx_fecha    = col('Diario')
-    idx_ventas   = col('Venta POS')
-    idx_embarque = col('Cntd Embarque')
+    idx_ventas   = col('Cnt POS')       # Unidades vendidas (Cnt POS)
+    idx_embarque = col('Cntd Embarque') # Unidades embarcadas
 
     records = []
     for row in ws.iter_rows(min_row=2, values_only=True):
