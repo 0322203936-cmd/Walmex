@@ -415,15 +415,19 @@ function imprimirReporte(){
       '<div class="box"><div class="box-hdr">'+projTit+'</div>'+
         '<table><thead><tr><th>Producto</th><th>Proyección</th></tr></thead>'+
         '<tbody>'+tProj+'</tbody></table></div>'+
-    '</div>'+
-    '<div class="footer">Centro Floricultor de Baja California &nbsp;·&nbsp; '+fecha+'</div>'
+    '</div>'
   );
 
   win.document.write('</body></html>');
   win.document.close();
 
-  // Abrir diálogo de impresión cuando la ventana esté lista
-  win.onload = function(){ setTimeout(function(){ win.print(); }, 350); };
+  // Abrir diálogo de impresión y cerrar ventana al terminar
+  win.onload = function(){
+    setTimeout(function(){
+      win.print();
+      win.onafterprint = function(){ win.close(); };
+    }, 350);
+  };
 }
 
 window.addEventListener('load', init);
