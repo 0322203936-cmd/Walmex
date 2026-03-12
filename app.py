@@ -198,35 +198,27 @@ def cargar_datos(url: str = "") -> dict:
         raw_semana[r['tienda']][r['semana']]['merma_u']    += r['merma_u']
         raw_semana[r['tienda']][r['semana']]['retail_vc']  += r['retail_vc']
 
-    # ── Totales por PRODUCTO ────────────────────────────────────────────────────
-    # Global: todos las tiendas, todas las semanas
+    # ── Totales por PRODUCTO (solo 2 estructuras livianas) ─────────────────────
+    # Global: todas las tiendas, todas las semanas
     totales_producto = defaultdict(lambda: defaultdict(float))
     # Por tienda: todas las semanas de esa tienda
     totales_tienda_producto = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
-    # Por semana: todas las tiendas de esa semana
-    raw_semana_producto = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
-    # Por tienda+semana: raw sin rolling (para clic en tienda + semana específica)
-    raw_stp_prod = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(float))))
 
     for r in records:
         for field in ['embarque_u', 'venta_cfbc', 'merma_u', 'retail_vc']:
-            totales_producto[r['producto']][field]                              += r[field]
-            totales_tienda_producto[r['tienda']][r['producto']][field]          += r[field]
-            raw_semana_producto[r['semana']][r['producto']][field]              += r[field]
-            raw_stp_prod[r['tienda']][r['semana']][r['producto']][field]        += r[field]
+            totales_producto[r['producto']][field]                     += r[field]
+            totales_tienda_producto[r['tienda']][r['producto']][field] += r[field]
 
     return {
-        'semanas':               semanas,
-        'tiendas':               tiendas,
-        'productos':             productos,
-        'fecha_por_semana':      fecha_por_semana,
-        'data':                  {t: {str(s): v for s, v in sv2.items()} for t, sv2 in result.items()},
-        'totales_tienda':        {t: dict(v) for t, v in totales_tienda.items()},
-        'raw_semana':            {t: {str(s): dict(v) for s, v in sv.items()} for t, sv in raw_semana.items()},
-        'totales_producto':      {p: dict(v) for p, v in totales_producto.items()},
-        'totales_tienda_prod':   {t: {p: dict(v) for p, v in pv.items()} for t, pv in totales_tienda_producto.items()},
-        'raw_sem_prod':          {str(s): {p: dict(v) for p, v in pv.items()} for s, pv in raw_semana_producto.items()},
-        'raw_stp_prod':          {t: {str(s): {p: dict(v) for p, v in pv.items()} for s, pv in sv.items()} for t, sv in raw_stp_prod.items()},
+        'semanas':             semanas,
+        'tiendas':             tiendas,
+        'productos':           productos,
+        'fecha_por_semana':    fecha_por_semana,
+        'data':                {t: {str(s): v for s, v in sv2.items()} for t, sv2 in result.items()},
+        'totales_tienda':      {t: dict(v) for t, v in totales_tienda.items()},
+        'raw_semana':          {t: {str(s): dict(v) for s, v in sv.items()} for t, sv in raw_semana.items()},
+        'totales_producto':    {p: dict(v) for p, v in totales_producto.items()},
+        'totales_tienda_prod': {t: {p: dict(v) for p, v in pv.items()} for t, pv in totales_tienda_producto.items()},
     }
 
 try:
@@ -510,30 +502,38 @@ function selMermaTienda(t){
 }
 
 // ── Helper: obtener datos de producto según contexto ─────────────────────────
+// Usa DATA.data (ya existente) para evitar estructuras duplicadas en el JSON
 function getProdData(tiendaSel, key, isAll){
   var prods = DATA.productos;
+  var tiendas = DATA.tiendas;
   return prods.map(function(p){
     var emb=0, cfbc=0, merma=0, retail=0;
     if(isAll){
       if(tiendaSel){
-        // tienda específica, todas las semanas
+        // tienda específica, todas las semanas → sumar cada semana desde data
+        DATA.semanas.forEach(function(s){
+          var sk = String(s);
+          var d = ((DATA.data[tiendaSel]||{})[sk]||{})[p] || {};
+          // data ya tiene emb=embarque 3sem, cfbc=venta cfbc 3sem — usamos totales_tienda_prod
+        });
+        // Mejor: usar totales_tienda_prod precalculado
         var d = ((DATA.totales_tienda_prod||{})[tiendaSel]||{})[p] || {};
         emb=d.embarque_u||0; cfbc=d.venta_cfbc||0; merma=d.merma_u||0; retail=d.retail_vc||0;
       } else {
-        // todas las tiendas, todas las semanas
+        // todas las tiendas, todas las semanas → totales_producto
         var d = (DATA.totales_producto||{})[p] || {};
         emb=d.embarque_u||0; cfbc=d.venta_cfbc||0; merma=d.merma_u||0; retail=d.retail_vc||0;
       }
     } else {
-      if(tiendaSel){
-        // tienda específica, semana específica
-        var d = (((DATA.raw_stp_prod||{})[tiendaSel]||{})[key]||{})[p] || {};
-        emb=d.embarque_u||0; cfbc=d.venta_cfbc||0; merma=d.merma_u||0; retail=d.retail_vc||0;
-      } else {
-        // todas las tiendas, semana específica
-        var d = ((DATA.raw_sem_prod||{})[key]||{})[p] || {};
-        emb=d.embarque_u||0; cfbc=d.venta_cfbc||0; merma=d.merma_u||0; retail=d.retail_vc||0;
-      }
+      // semana específica: sumar sobre tiendas desde DATA.data (ya en memoria)
+      var tLista = tiendaSel ? [tiendaSel] : tiendas;
+      tLista.forEach(function(t){
+        var d = ((DATA.data[t]||{})[key]||{})[p] || {};
+        emb   += d.emb    || 0;
+        cfbc  += d.cfbc   || 0;
+        merma += d.m3     || 0;
+        retail+= d.retail || 0;
+      });
     }
     return {prod:p, emb:emb, cfbc:cfbc, merma:merma, retail:retail};
   });
