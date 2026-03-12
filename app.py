@@ -63,34 +63,38 @@ def cargar_datos(url: str) -> dict:
     for row in ws.iter_rows(min_row=2, values_only=True):
         producto  = str(row[idx_producto]).strip() if row[idx_producto] else None
         tienda    = str(row[idx_tienda]).strip()   if row[idx_tienda]   else None
-        semana    = row[idx_semana] if row[idx_semana] is not None else None
-        # Fecha: puede venir como datetime, string MM/DD/YYYY o DD/MM/YYYY
+        # Semana: valor simple como 50, 51 etc
+        try:
+            semana_num = int(float(row[idx_semana])) if row[idx_semana] is not None else None
+        except:
+            semana_num = None
+
+        # Fecha: puede venir como datetime o string MM/DD/YYYY
+        from datetime import datetime as _dt
         fecha_raw = row[idx_fecha]
+        anio = None
         if hasattr(fecha_raw, 'strftime'):
-            # openpyxl ya la parseó como datetime
             fecha = fecha_raw.strftime('%d/%m/%Y')
+            anio  = fecha_raw.year
         elif fecha_raw:
             s_fecha = str(fecha_raw).strip()
-            # Intentar parsear MM/DD/YYYY
-            try:
-                from datetime import datetime
-                dt = datetime.strptime(s_fecha, '%m/%d/%Y')
-                fecha = dt.strftime('%d/%m/%Y')
-            except:
+            for fmt in ('%m/%d/%Y','%d/%m/%Y','%Y-%m-%d'):
                 try:
-                    from datetime import datetime
-                    dt = datetime.strptime(s_fecha, '%d/%m/%Y')
+                    dt   = _dt.strptime(s_fecha, fmt)
                     fecha = dt.strftime('%d/%m/%Y')
+                    anio  = dt.year
+                    break
                 except:
-                    fecha = s_fecha
+                    continue
+            else:
+                fecha = s_fecha
         else:
             fecha = ''
-        # Semana puede venir como float (ej: 6.0) — convertir a int
-        try:
-            semana = int(float(semana)) if semana is not None else None
-        except:
-            semana = None
-        if not producto or not tienda or not semana: continue
+
+        if not producto or not tienda or not semana_num: continue
+
+        # Clave semana = año*100 + num  (ej: 202550)
+        semana = (anio * 100 + semana_num) if anio else semana_num
         records.append({
             'producto':   producto,
             'tienda':     tienda,
@@ -138,6 +142,15 @@ def cargar_datos(url: str) -> dict:
                     'pct_merma': round(m3/emb*100) if emb > 0 else 0,
                 }
             result[t][s] = prod_data
+
+    # DEBUG — mostrar en logs qué semanas y fechas se encontraron
+    import sys
+    print(f"SEMANAS ENCONTRADAS: {semanas}", file=sys.stderr)
+    print(f"TOTAL REGISTROS: {len(records)}", file=sys.stderr)
+    print(f"FECHAS POR SEMANA: {fecha_por_semana}", file=sys.stderr)
+    # Muestra los primeros 5 valores crudos de SEM y Diario
+    for i, row in enumerate(ws.iter_rows(min_row=2, max_row=6, values_only=True)):
+        print(f"  fila {i+2}: SEM={row[idx_semana]!r}  Diario={row[idx_fecha]!r}", file=sys.stderr)
 
     return {
         'semanas':          semanas,
@@ -272,6 +285,8 @@ function init(){
     opt.value = s;
     var yr = Math.floor(s/100), wk = s%100;
     opt.textContent = yr+' · Semana '+String(wk).padStart(2,'0');
+    // solo mostrar si el año es razonable (mayor a 2000)
+    if(yr < 2000){ opt.textContent = 'Semana '+String(s).padStart(2,'0'); }
     sel.appendChild(opt);
   });
   state.semana = DATA.semanas[DATA.semanas.length-1];
@@ -301,9 +316,11 @@ function updateHeader(){
     ? DATA.fecha_por_semana[state.semana]
     : '—';
   document.getElementById('hdrFecha').textContent   = fecha;
-  document.getElementById('hdrSem').textContent     = state.semana%100;
+  var semNum = state.semana > 9999 ? state.semana%100 : state.semana;
+  var semAnio = state.semana > 9999 ? Math.floor(state.semana/100) : '';
+  document.getElementById('hdrSem').textContent     = (semAnio ? semAnio+' · ' : '')+'Semana '+String(semNum).padStart(2,'0');
   document.getElementById('hdrTienda').textContent  = state.tienda;
-  document.getElementById('projTitle').textContent  = 'Proyección Semana '+(state.semana%100+1);
+  document.getElementById('projTitle').textContent  = 'Proyección Semana '+(semNum+1);
 }
 
 function getD(){
