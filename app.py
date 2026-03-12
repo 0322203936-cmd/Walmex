@@ -137,9 +137,18 @@ body{background:#fff;font-family:Arial,sans-serif;font-size:12px;color:#111}
 .wm-logo{display:flex;align-items:center;gap:4px}
 .wm-text{font-size:1.2rem;font-weight:700;color:#0071ce;letter-spacing:-0.5px}
 .wm-spark{color:#ffc220;font-size:1.3rem;line-height:1}
-.hdr-right{text-align:right;font-size:.72rem;color:#333;line-height:1.6}
+.hdr-right{display:flex;align-items:center;gap:10px;text-align:right;font-size:.72rem;color:#333;line-height:1.6}
 .hdr-tienda{padding:3px 16px 4px;font-size:.78rem;color:#333;border-bottom:1px solid #ddd}
 .hdr-tienda strong{font-size:.8rem}
+
+/* ── BOTÓN IMPRIMIR ── */
+.btn-print{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:4px 14px;border-radius:4px;border:1px solid #0071ce;
+  background:#fff;color:#0071ce;font-size:.7rem;font-weight:700;
+  cursor:pointer;transition:.15s;white-space:nowrap;flex-shrink:0;
+}
+.btn-print:hover{background:#0071ce;color:#fff}
 
 /* ── CONTROLS ── */
 .ctrl{display:flex;align-items:center;gap:8px;padding:5px 16px;background:#f5f7fa;border-bottom:1px solid #ddd;flex-wrap:wrap}
@@ -172,6 +181,14 @@ table.t tr:hover:not(.total) td{background:#f0f7ff}
 .ld-bar{width:160px;height:3px;background:#dde;border-radius:2px;overflow:hidden}
 .ld-fill{height:100%;background:#0071ce;animation:ld .9s ease-in-out infinite}
 @keyframes ld{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}
+
+/* ── IMPRESIÓN ── */
+@media print{
+  .ctrl,.btn-print{display:none!important}
+  body{background:#fff!important}
+  .grid{grid-template-columns:1fr 1fr}
+  .box{break-inside:avoid;border:1px solid #999}
+}
 </style>
 </head>
 <body>
@@ -187,8 +204,12 @@ table.t tr:hover:not(.total) td{background:#f0f7ff}
       <div class="wm-spark">&#10022;</div>
     </div>
     <div class="hdr-right">
-      <div id="hdrFecha">—</div>
-      <div>Semana&nbsp;&nbsp;<strong id="hdrSem">—</strong></div>
+      <div>
+        <div id="hdrFecha">—</div>
+        <div>Semana&nbsp;&nbsp;<strong id="hdrSem">—</strong></div>
+      </div>
+      <!-- ✅ BOTÓN IMPRIMIR — abre ventana limpia sin Streamlit -->
+      <button class="btn-print" onclick="imprimirReporte()">🖨️ Imprimir</button>
     </div>
   </div>
   <div class="hdr-tienda">Nombre de Tienda&nbsp;&nbsp;<strong id="hdrTienda">—</strong></div>
@@ -245,7 +266,6 @@ function init(){
     document.body.innerHTML='<p style="padding:20px;color:red">Error: '+m+' (línea '+l+')</p>';
   };
 
-  // Semanas
   var sel = document.getElementById('semSel');
   DATA.semanas.forEach(function(s){
     var opt = document.createElement('option');
@@ -298,7 +318,6 @@ function render(){
   var prods = DATA.productos;
 
   var totV12=0, totV3=0, totEmb=0, totM3=0, totAvg=0, totProj=0;
-
   var histRows='', mermaRows='', avgRows='', projRows='';
 
   prods.forEach(function(p){
@@ -327,6 +346,84 @@ function render(){
   document.getElementById('tMerma').innerHTML = mermaRows;
   document.getElementById('tAvg').innerHTML   = avgRows;
   document.getElementById('tProj').innerHTML  = projRows;
+}
+
+// ═══════════════════════════════════════════
+// IMPRIMIR — ventana nueva fuera del iframe de Streamlit
+// ═══════════════════════════════════════════
+function imprimirReporte(){
+  // Capturar estado actual
+  var tienda  = document.getElementById('hdrTienda').textContent;
+  var semana  = document.getElementById('hdrSem').textContent;
+  var fecha   = document.getElementById('hdrFecha').textContent;
+  var projTit = document.getElementById('projTitle').textContent;
+  var tHist   = document.getElementById('tHist').innerHTML;
+  var tMerma  = document.getElementById('tMerma').innerHTML;
+  var tAvg    = document.getElementById('tAvg').innerHTML;
+  var tProj   = document.getElementById('tProj').innerHTML;
+
+  var win = window.open('','_blank','width=960,height=760');
+  win.document.write('<!DOCTYPE html><html lang="es"><head>');
+  win.document.write('<meta charset="UTF-8">');
+  win.document.write('<title>Walmart CFBC · Sem '+semana+' · '+tienda+'</title>');
+  win.document.write('<style>'+
+    '*{box-sizing:border-box;margin:0;padding:0}'+
+    'body{background:#fff;font-family:Arial,sans-serif;font-size:12px;color:#111;padding:16px}'+
+    '.hdr{display:flex;align-items:center;justify-content:space-between;padding-bottom:8px;border-bottom:2px solid #0071ce;margin-bottom:6px}'+
+    '.logo{display:flex;align-items:center;gap:5px}'+
+    '.wm-text{font-size:1.3rem;font-weight:700;color:#0071ce}'+
+    '.wm-spark{color:#ffc220;font-size:1.4rem}'+
+    '.hdr-info{text-align:right;font-size:.72rem;color:#333;line-height:1.7}'+
+    '.sub{font-size:.78rem;color:#333;padding:4px 0 10px;border-bottom:1px solid #ddd;margin-bottom:12px}'+
+    '.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}'+
+    '.box{border:1px solid #bbb;border-radius:4px;overflow:hidden;break-inside:avoid}'+
+    '.box-hdr{background:#f0f0f0;border-bottom:1px solid #bbb;padding:4px 10px;text-align:center;font-size:.74rem;font-weight:700}'+
+    'table{width:100%;border-collapse:collapse}'+
+    'th{padding:3px 10px;font-size:.67rem;font-weight:700;color:#333;border-bottom:1px solid #ccc;text-align:right;background:#fafafa}'+
+    'th:first-child{text-align:left}'+
+    'td{padding:2px 10px;font-size:.72rem;text-align:right;color:#222;white-space:nowrap}'+
+    'td:first-child{text-align:left;color:#111}'+
+    'tr.total td{font-weight:700;border-top:1px solid #ddd;background:#f5f5f5}'+
+    '.red{color:#c00;font-weight:600}.bold{font-weight:700}'+
+    '.footer{margin-top:14px;font-size:.65rem;color:#999;text-align:center}'+
+    '@page{margin:10mm}'+
+    '@media print{body{padding:0}}'+
+  '</style></head><body>');
+
+  win.document.write(
+    '<div class="hdr">'+
+      '<div class="logo">'+
+        '<span class="wm-text">Walmart</span>'+
+        '<span class="wm-spark">&#10022;</span>'+
+      '</div>'+
+      '<div class="hdr-info">'+
+        '<div>'+fecha+'</div>'+
+        '<div>Semana &nbsp;<strong>'+semana+'</strong></div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="sub">Nombre de Tienda &nbsp;<strong>'+tienda+'</strong></div>'+
+    '<div class="grid">'+
+      '<div class="box"><div class="box-hdr">Ventas Históricas</div>'+
+        '<table><thead><tr><th>Producto</th><th>12 Semanas</th><th>3 Semanas</th></tr></thead>'+
+        '<tbody>'+tHist+'</tbody></table></div>'+
+      '<div class="box"><div class="box-hdr">Índice de Merma por Artículo Últimas 3 Semanas</div>'+
+        '<table><thead><tr><th>Producto</th><th>Embarque</th><th>3 Semanas</th></tr></thead>'+
+        '<tbody>'+tMerma+'</tbody></table></div>'+
+      '<div class="box"><div class="box-hdr">Venta Promedio Semanal</div>'+
+        '<table><thead><tr><th>Producto</th><th>Promedio</th></tr></thead>'+
+        '<tbody>'+tAvg+'</tbody></table></div>'+
+      '<div class="box"><div class="box-hdr">'+projTit+'</div>'+
+        '<table><thead><tr><th>Producto</th><th>Proyección</th></tr></thead>'+
+        '<tbody>'+tProj+'</tbody></table></div>'+
+    '</div>'+
+    '<div class="footer">Centro Floricultor de Baja California &nbsp;·&nbsp; '+fecha+'</div>'
+  );
+
+  win.document.write('</body></html>');
+  win.document.close();
+
+  // Abrir diálogo de impresión cuando la ventana esté lista
+  win.onload = function(){ setTimeout(function(){ win.print(); }, 350); };
 }
 
 window.addEventListener('load', init);
