@@ -60,8 +60,16 @@ def cargar_datos(url: str = "") -> dict:
     idx_ventas   = col('Cnt POS')       # Unidades vendidas (Cnt POS)
     idx_embarque = col('Cntd Embarque') # Unidades embarcadas
     idx_merma_vc = col('Cant VC Tienda') # Merma (Cant VC Tienda)
-    idx_venta_cfbc = col('Venta CFBC / Costo (Facturado)') # Venta CFBC para Tienda
-    idx_retail_vc = col('Suma de Retail VC Tienda') # Retail VC Tienda
+    
+    # Columnas opcionales para Tienda
+    try:
+        idx_venta_cfbc = col('Venta CFBC / Costo (Facturado)')
+    except:
+        idx_venta_cfbc = None
+    try:
+        idx_retail_vc = col('Suma de Retail VC Tienda')
+    except:
+        idx_retail_vc = None
 
     records = []
     for row in ws.iter_rows(min_row=2, values_only=True):
@@ -107,8 +115,8 @@ def cargar_datos(url: str = "") -> dict:
             'ventas_u':   sv(row[idx_ventas]),
             'embarque_u': sv(row[idx_embarque]),
             'merma_u':    sv(row[idx_merma_vc]),  # Tomar directamente de Cant VC Tienda
-            'venta_cfbc': sv(row[idx_venta_cfbc]),  # Venta CFBC
-            'retail_vc':  sv(row[idx_retail_vc]),   # Retail VC Tienda
+            'venta_cfbc': sv(row[idx_venta_cfbc]) if idx_venta_cfbc is not None else 0,  # Venta CFBC
+            'retail_vc':  sv(row[idx_retail_vc]) if idx_retail_vc is not None else 0,   # Retail VC Tienda
         })
 
     semanas   = sorted(set(r['semana'] for r in records))
@@ -142,8 +150,8 @@ def cargar_datos(url: str = "") -> dict:
                 v3   = sum(by_stp[sem][t][p]['ventas_u']   for sem in last3)
                 emb3 = sum(by_stp[sem][t][p]['embarque_u'] for sem in last3)  # embarque 3 semanas
                 m3   = sum(by_stp[sem][t][p]['merma_u']    for sem in last3)  # merma 3 semanas (Cant VC Tienda)
-                cfbc3 = sum(by_stp[sem][t][p]['venta_cfbc'] for sem in last3)  # Venta CFBC 3 semanas
-                retail3 = sum(by_stp[sem][t][p]['retail_vc'] for sem in last3)  # Retail VC 3 semanas
+                cfbc3 = sum(by_stp[sem][t][p].get('venta_cfbc', 0) for sem in last3)  # Venta CFBC 3 semanas
+                retail3 = sum(by_stp[sem][t][p].get('retail_vc', 0) for sem in last3)  # Retail VC 3 semanas
                 avg  = v3 / len(last3) if last3 else 0  # Promedio = 3 semanas / 3
                 
                 # Proyección = Venta Promedio / (1 - Índice Merma %)
