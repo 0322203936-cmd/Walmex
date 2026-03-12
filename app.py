@@ -28,6 +28,12 @@ section[data-testid='stSidebar'] { display:none !important; }
 [data-testid='stVerticalBlock'] { gap: 0 !important; padding: 0 !important; }
 div[data-testid='stHtml'] { padding: 0 !important; margin: 0 !important; line-height: 0 !important; }
 iframe { display: block !important; margin: 0 !important; border: none !important; }
+/* Ocultar badge Made with Streamlit */
+footer { display: none !important; }
+[data-testid="stBottom"] { display: none !important; }
+.viewerBadge_container__r5tak { display: none !important; }
+.styles_viewerBadge__CvC9N { display: none !important; }
+a[href="https://streamlit.io"] { display: none !important; }
 </style>""", unsafe_allow_html=True)
 
 @st.cache_data(ttl=3600)
@@ -323,8 +329,13 @@ window.addEventListener('load', init);
       '.stDeployButton{display:none!important}',
       '#MainMenu{display:none!important}',
       'button[kind="header"]{display:none!important}',
+      '[data-testid="manage-app-button"]{display:none!important}',
       '.viewerBadge_container__r5tak{display:none!important}',
       '.styles_viewerBadge__CvC9N{display:none!important}',
+      'a[href="https://streamlit.io"]{display:none!important}',
+      '#stDecoration{display:none!important}',
+      'footer{display:none!important}',
+      '[data-testid="stBottom"]{display:none!important}',
     ].join('');
     p.head.appendChild(style);
   } catch(e){}
