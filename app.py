@@ -420,12 +420,17 @@ function renderTienda(){
   
   tiendas.forEach(function(tienda){
     var emb_g=0,cfbc_g=0,merma_g=0,retail_g=0;
-    prods.forEach(function(p){
-      DATA.semanas.forEach(function(sem){
-        var d = (DATA.data[tienda]&&DATA.data[tienda][String(sem)]&&DATA.data[tienda][String(sem)][p]) || {emb:0,cfbc:0,m3:0,retail:0};
-        emb_g+=d.emb; cfbc_g+=d.cfbc; merma_g+=d.m3; retail_g+=d.retail;
-      });
-    });
+    for(var semIdx=0; semIdx<DATA.semanas.length; semIdx++){
+      var sem = DATA.semanas[semIdx];
+      var semKey = String(sem);
+      for(var pIdx=0; pIdx<prods.length; pIdx++){
+        var p = prods[pIdx];
+        if(DATA.data[tienda]&&DATA.data[tienda][semKey]&&DATA.data[tienda][semKey][p]){
+          var d = DATA.data[tienda][semKey][p];
+          emb_g+=d.emb||0; cfbc_g+=d.cfbc||0; merma_g+=d.m3||0; retail_g+=d.retail||0;
+        }
+      }
+    }
     totEmb_global+=emb_g; totCfbc_global+=cfbc_g; totMerma_global+=merma_g; totRetail_global+=retail_g;
     tiendaDataGlobal.push({tienda:tienda, emb:emb_g, cfbc:cfbc_g, merma:merma_g, retail:retail_g});
   });
@@ -438,7 +443,7 @@ function renderTienda(){
     var v3t=0,avg3t=0,proj3t=0;
     prods.forEach(function(p){
       var d = (DATA.data[tienda]&&DATA.data[tienda][key]&&DATA.data[tienda][key][p]) || {v3:0,avg:0,proj:0};
-      v3t+=d.v3; avg3t+=d.avg; proj3t+=d.proj;
+      v3t+=d.v3||0; avg3t+=d.avg||0; proj3t+=d.proj||0;
     });
     totAvg+=avg3t; totProj+=proj3t;
     tiendaDataSem.push({tienda:tienda, v3:v3t, avg:avg3t, proj:proj3t});
