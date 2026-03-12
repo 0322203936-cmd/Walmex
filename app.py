@@ -422,12 +422,12 @@ function renderTienda(){
   var prods = DATA.productos;
   var key = String(state.semana);
   
-  // DATOS GLOBALES para TOP VENTA y TOP MERMA (todas las semanas)
-  var totEmb_global=0,totCfbc_global=0,totMerma_global=0,totRetail_global=0;
+  // DATOS GLOBALES para TOP VENTA y TOP MERMA (todas las semanas, todos los productos)
+  var totEmb_global=0,totV12_global=0,totMerma_global=0,totRetail_global=0;
   var tiendaDataGlobal = [];
   
   tiendas.forEach(function(tienda){
-    var emb_g=0,cfbc_g=0,merma_g=0,retail_g=0;
+    var emb_g=0,v12_g=0,merma_g=0,retail_g=0;
     for(var semIdx=0; semIdx<DATA.semanas.length; semIdx++){
       var sem = DATA.semanas[semIdx];
       var semKey = String(sem);
@@ -435,12 +435,15 @@ function renderTienda(){
         var p = prods[pIdx];
         if(DATA.data[tienda]&&DATA.data[tienda][semKey]&&DATA.data[tienda][semKey][p]){
           var d = DATA.data[tienda][semKey][p];
-          emb_g+=d.emb||0; cfbc_g+=d.cfbc||0; merma_g+=d.m3||0; retail_g+=d.retail||0;
+          emb_g += (d.emb||0);
+          v12_g += (d.v12||0);
+          merma_g += (d.m3||0);
+          retail_g += (d.retail||0);
         }
       }
     }
-    totEmb_global+=emb_g; totCfbc_global+=cfbc_g; totMerma_global+=merma_g; totRetail_global+=retail_g;
-    tiendaDataGlobal.push({tienda:tienda, emb:emb_g, cfbc:cfbc_g, merma:merma_g, retail:retail_g});
+    totEmb_global+=emb_g; totV12_global+=v12_g; totMerma_global+=merma_g; totRetail_global+=retail_g;
+    tiendaDataGlobal.push({tienda:tienda, emb:emb_g, v12:v12_g, merma:merma_g, retail:retail_g});
   });
   
   // DATOS POR SEMANA ACTUAL para Venta Promedio y Comparación
@@ -460,10 +463,10 @@ function renderTienda(){
   // Generar filas para TOP VENTA (datos globales)
   var histRows='';
   tiendaDataGlobal.forEach(function(t){
-    var pct_venta = totCfbc_global > 0 ? Math.round(t.cfbc/totCfbc_global*100) : 0;
-    histRows  += '<tr><td>'+t.tienda+'</td><td>'+fmt(t.emb)+'</td><td>$ '+fmt(t.cfbc)+'</td><td>'+pct_venta+'%</td></tr>';
+    var pct_venta = totV12_global > 0 ? Math.round(t.v12/totV12_global*100) : 0;
+    histRows  += '<tr><td>'+t.tienda+'</td><td>'+fmt(t.emb)+'</td><td>$ '+fmt(t.v12)+'</td><td>'+pct_venta+'%</td></tr>';
   });
-  histRows  += '<tr class="total"><td>Total</td><td>'+fmt(totEmb_global)+'</td><td>$ '+fmt(totCfbc_global)+'</td><td>100%</td></tr>';
+  histRows  += '<tr class="total"><td>Total</td><td>'+fmt(totEmb_global)+'</td><td>$ '+fmt(totV12_global)+'</td><td>100%</td></tr>';
   
   // Generar filas para TOP MERMA (datos globales)
   var mermaRows='';
