@@ -3,42 +3,33 @@ Walmex Dashboard — CFBC
 Reporte ejecutivo estilo Walmart
 """
 import json, base64, openpyxl
-from collections import defaultdict
 from pathlib import Path
+from datetime import datetime as _dt
 import streamlit as st
 import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Walmex · CFBC", layout="wide", initial_sidebar_state="collapsed")
-
 st.markdown("""
 <style>
-.main .block-container { padding: 0 !important; max-width: 100% !important; margin: 0 !important; }
-.main { padding: 0 !important; overflow: hidden !important; }
-.stApp { margin: 0 !important; }
+.main .block-container{padding:0!important;max-width:100%!important;margin:0!important}
+.main{padding:0!important;overflow:hidden!important}
+.stApp{margin:0!important}
 [data-testid="stHeader"],[data-testid="stSidebar"],[data-testid="stToolbar"],
 [data-testid="stDecoration"],[data-testid="stStatusWidget"],
-#MainMenu, header, footer {
-    display: none !important; visibility: hidden !important; height: 0 !important;
-}
-.stDeployButton { display: none !important; }
-div[style*="bottom: 1.5rem"], div[style*="bottom: 15px"],
-div[style*="position: fixed"][style*="bottom"][style*="right"],
-iframe[src*="badge"] {
-    display: none !important; opacity: 0 !important;
-    pointer-events: none !important; visibility: hidden !important;
-}
-[data-testid='stVerticalBlock'] { gap: 0 !important; padding: 0 !important; }
-div[data-testid='stHtml'] { padding: 0 !important; margin: 0 !important; line-height: 0 !important; }
-iframe { display: block !important; margin: 0 !important; border: none !important; }
+#MainMenu,header,footer{display:none!important;visibility:hidden!important;height:0!important}
+.stDeployButton{display:none!important}
+[data-testid='stVerticalBlock']{gap:0!important;padding:0!important}
+div[data-testid='stHtml']{padding:0!important;margin:0!important;line-height:0!important}
+iframe{display:block!important;margin:0!important;border:none!important}
 </style>
 """, unsafe_allow_html=True)
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def cargar_datos(url: str = "") -> dict:
+def cargar_datos() -> dict:
     paths = ["Analisis_Walmart.xlsx", "Analisis Walmart.xlsx"]
     excel_path = next((p for p in paths if Path(p).exists()), None)
     if not excel_path:
-        raise FileNotFoundError("No se encontró Analisis_Walmart.xlsx. Súbelo al repo de GitHub.")
+        raise FileNotFoundError("No se encontró Analisis_Walmart.xlsx en el repositorio.")
     wb = openpyxl.load_workbook(excel_path, data_only=True, read_only=True)
     ws = wb['Data']
 
@@ -46,108 +37,59 @@ def cargar_datos(url: str = "") -> dict:
         try: return float(v) if v is not None else 0.0
         except: return 0.0
 
-    # Mapear columnas por nombre de encabezado — fila 1
-    headers = [str(c.value).strip() if c.value else '' for c in ws[1]]
+    headers = [str(c.value).strip() if c.value else '' for c in next(ws.iter_rows(min_row=1, max_row=1))]
     def col(name):
+        nl = name.strip().lower()
         for i, h in enumerate(headers):
-            if h == name: return i
-        raise ValueError(f'Columna "{name}" no encontrada. Encabezados: {headers}')
+            if h.strip().lower() == nl: return i
+        raise ValueError(f'Columna "{name}" no encontrada.')
 
-    # Log headers para diagnóstico si alguna columna falla
-    import sys
-    _col_names = [h for h in headers if h]
-    
-    idx_producto = col('Desc Art 1')
-    idx_tienda   = col('Nombre Tienda/Club')
-    idx_semana   = col('SEM')
-    idx_fecha    = col('Diario')
-    idx_ventas   = col('Cnt POS')       # Unidades vendidas (Cnt POS)
-    idx_embarque = col('Cntd Embarque') # Unidades embarcadas
-    idx_merma_vc = col('Cant VC Tienda') # Merma (Cant VC Tienda)
-    
-    # Columnas opcionales para Tienda — intentar varios nombres posibles
-    idx_venta_cfbc = None
-    for _n in ['Venta CFBC / Costo (Facturado)', 'Venta CFBC/Costo (Facturado)',
-               'Venta CFBC', 'CFBC']:
-        try: idx_venta_cfbc = col(_n); break
-        except: pass
-
-    idx_retail_vc = None
-    for _n in ['Suma de Retail VC Tienda', 'Retail VC Tienda',
-               'Suma Retail VC Tienda', 'Retail VC', 'Suma de Retail VC',
-               'Suma de Retail VC Tienda ']:  # trailing space variant
-        try: idx_retail_vc = col(_n); break
-        except: pass
-
-    # Advertir si columnas clave no se encontraron
-    if idx_retail_vc is None:
-        import streamlit as _st
-        _st.warning(
-            f"⚠️ No se encontró columna 'Retail VC Tienda'. "
-            f"Columnas disponibles: {[h for h in headers if h and 'VC' in h or 'Retail' in h or 'retail' in h.lower() if h]}\n"
-            f"Todos los encabezados: {[h for h in headers if h]}"
-        )
+    idx_producto  = col('Desc Art 1')
+    idx_tienda    = col('Nombre Tienda/Club')
+    idx_semana    = col('SEM')
+    idx_fecha     = col('Diario')
+    idx_ventas    = col('Cnt POS')
+    idx_embarque  = col('Cntd Embarque')
+    idx_merma_vc  = col('Cant VC Tienda')
+    idx_cfbc      = col('Venta CFBC / Costo (Facturado)')
+    idx_retail    = col('Retail VC Tienda')
 
     records = []
     for row in ws.iter_rows(min_row=2, values_only=True):
-        producto  = str(row[idx_producto]).strip() if row[idx_producto] else None
-        tienda    = str(row[idx_tienda]).strip()   if row[idx_tienda]   else None
-        # Semana: valor simple como 50, 51 etc
-        try:
-            semana_num = int(float(row[idx_semana])) if row[idx_semana] is not None else None
-        except:
-            semana_num = None
-
-        # Fecha: puede venir como datetime o string MM/DD/YYYY
-        fecha_raw = row[idx_fecha]
-        anio = None
-        if hasattr(fecha_raw, 'strftime'):
-            fecha = fecha_raw.strftime('%d/%m/%Y')
-            anio  = fecha_raw.year
-        elif fecha_raw:
-            s_fecha = str(fecha_raw).strip()
-            for fmt in ('%m/%d/%Y','%d/%m/%Y','%Y-%m-%d'):
-                try:
-                    dt   = _dt.strptime(s_fecha, fmt)
-                    fecha = dt.strftime('%d/%m/%Y')
-                    anio  = dt.year
-                    break
-                except:
-                    continue
-            else:
-                fecha = s_fecha
-        else:
-            fecha = ''
-
+        producto = str(row[idx_producto]).strip() if row[idx_producto] else None
+        tienda   = str(row[idx_tienda]).strip()   if row[idx_tienda]   else None
+        try: semana_num = int(float(row[idx_semana])) if row[idx_semana] is not None else None
+        except: semana_num = None
         if not producto or not tienda or not semana_num: continue
 
-        # Clave semana = año*100 + num  (ej: 202550)
-        semana = (anio * 100 + semana_num) if anio else semana_num
+        fecha_raw = row[idx_fecha]; anio = None
+        if hasattr(fecha_raw, 'strftime'):
+            fecha = fecha_raw.strftime('%d/%m/%Y'); anio = fecha_raw.year
+        elif fecha_raw:
+            for fmt in ('%m/%d/%Y', '%d/%m/%Y', '%Y-%m-%d'):
+                try: dt = _dt.strptime(str(fecha_raw).strip(), fmt); fecha = dt.strftime('%d/%m/%Y'); anio = dt.year; break
+                except: continue
+            else: fecha = str(fecha_raw)
+        else: fecha = ''
+        if not anio: continue
+
         records.append({
-            'producto':   producto,
-            'tienda':     tienda,
-            'semana':     semana,
-            'fecha':      fecha,
+            'producto': producto, 'tienda': tienda,
+            'semana':   anio * 100 + semana_num, 'fecha': fecha,
             'ventas_u':   sv(row[idx_ventas]),
             'embarque_u': sv(row[idx_embarque]),
-            'merma_u':    sv(row[idx_merma_vc]),  # Tomar directamente de Cant VC Tienda
-            'venta_cfbc': sv(row[idx_venta_cfbc]) if idx_venta_cfbc is not None else 0,  # Venta CFBC
-            'retail_vc':  sv(row[idx_retail_vc]) if idx_retail_vc is not None else 0,   # Retail VC Tienda
+            'merma_u':    sv(row[idx_merma_vc]),
+            'venta_cfbc': sv(row[idx_cfbc]),
+            'retail_vc':  sv(row[idx_retail]),
         })
-
     wb.close()
-    semanas   = sorted(set(r['semana'] for r in records))
-    tiendas   = sorted(set(r['tienda']  for r in records))
+
+    semanas   = sorted(set(r['semana']   for r in records))
+    tiendas   = sorted(set(r['tienda']   for r in records))
     productos = sorted(set(r['producto'] for r in records))
 
-    # ── UN SOLO LOOP — sin defaultdicts, sin loops triples ─────────────────────
-    from datetime import datetime as _dt2
-    fecha_por_semana    = {}
-    raw                 = {}
-    raw_sem_t           = {}
-    totales_tienda      = {}
-    totales_producto    = {}
-    totales_tienda_prod = {}
+    fecha_por_semana = {}; raw = {}; raw_sem_t = {}
+    totales_tienda = {}; totales_producto = {}; totales_tienda_prod = {}
 
     for r in records:
         t2=r['tienda']; s2=r['semana']; p2=r['producto']; sk=str(s2)
@@ -155,28 +97,23 @@ def cargar_datos(url: str = "") -> dict:
 
         if r['fecha']: fecha_por_semana[s2] = r['fecha']
 
-        # raw[sk][t2][p2] = [vu,eu,mu,cf,rv]
-        if sk not in raw:             raw[sk]={}
-        if t2 not in raw[sk]:         raw[sk][t2]={}
-        if p2 not in raw[sk][t2]:     raw[sk][t2][p2]=[0,0,0,0,0]
-        x=raw[sk][t2][p2]; x[0]+=vu; x[1]+=eu; x[2]+=mu; x[3]+=cf; x[4]+=rv
+        if sk not in raw:         raw[sk] = {}
+        if t2 not in raw[sk]:     raw[sk][t2] = {}
+        if p2 not in raw[sk][t2]: raw[sk][t2][p2] = [0,0,0,0,0]
+        x = raw[sk][t2][p2]; x[0]+=vu; x[1]+=eu; x[2]+=mu; x[3]+=cf; x[4]+=rv
 
-        # raw_sem_t[t2][sk]
-        if t2 not in raw_sem_t:       raw_sem_t[t2]={}
-        if sk not in raw_sem_t[t2]:   raw_sem_t[t2][sk]={'embarque_u':0,'venta_cfbc':0,'merma_u':0,'retail_vc':0}
+        if t2 not in raw_sem_t:       raw_sem_t[t2] = {}
+        if sk not in raw_sem_t[t2]:   raw_sem_t[t2][sk] = {'embarque_u':0,'venta_cfbc':0,'merma_u':0,'retail_vc':0}
         d=raw_sem_t[t2][sk]; d['embarque_u']+=eu; d['venta_cfbc']+=cf; d['merma_u']+=mu; d['retail_vc']+=rv
 
-        # totales_tienda[t2]
-        if t2 not in totales_tienda:  totales_tienda[t2]={'embarque_u':0,'venta_cfbc':0,'merma_u':0,'retail_vc':0}
+        if t2 not in totales_tienda:   totales_tienda[t2] = {'embarque_u':0,'venta_cfbc':0,'merma_u':0,'retail_vc':0}
         d=totales_tienda[t2]; d['embarque_u']+=eu; d['venta_cfbc']+=cf; d['merma_u']+=mu; d['retail_vc']+=rv
 
-        # totales_producto[p2]
-        if p2 not in totales_producto: totales_producto[p2]={'embarque_u':0,'venta_cfbc':0,'merma_u':0,'retail_vc':0}
+        if p2 not in totales_producto: totales_producto[p2] = {'embarque_u':0,'venta_cfbc':0,'merma_u':0,'retail_vc':0}
         d=totales_producto[p2]; d['embarque_u']+=eu; d['venta_cfbc']+=cf; d['merma_u']+=mu; d['retail_vc']+=rv
 
-        # totales_tienda_prod[t2][p2]
-        if t2 not in totales_tienda_prod:      totales_tienda_prod[t2]={}
-        if p2 not in totales_tienda_prod[t2]:  totales_tienda_prod[t2][p2]={'embarque_u':0,'venta_cfbc':0,'merma_u':0,'retail_vc':0}
+        if t2 not in totales_tienda_prod:      totales_tienda_prod[t2] = {}
+        if p2 not in totales_tienda_prod[t2]:  totales_tienda_prod[t2][p2] = {'embarque_u':0,'venta_cfbc':0,'merma_u':0,'retail_vc':0}
         d=totales_tienda_prod[t2][p2]; d['embarque_u']+=eu; d['venta_cfbc']+=cf; d['merma_u']+=mu; d['retail_vc']+=rv
 
     return {
@@ -747,4 +684,4 @@ def build_html():
     ).decode('ascii')
     return HTML.replace('__DATA_JSON__', data_json)
 
-components.html(build_html(), height=980, scrolling=False)
+components.html(build_html(), height=1600, scrolling=True)
