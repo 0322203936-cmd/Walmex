@@ -154,27 +154,33 @@ def cargar_datos(url: str = "") -> dict:
         if r['fecha']:
             fecha_por_semana[r['semana']] = r['fecha']
 
+    # Precalcular índices para evitar semanas.index() en cada iteración
+    sem_idx = {s: i for i, s in enumerate(semanas)}
+
     result = {}
     for t in tiendas:
         result[t] = {}
         for s in semanas:
-            idx    = semanas.index(s)
+            idx    = sem_idx[s]
             last12 = semanas[max(0, idx-11):idx+1]
             last3  = semanas[max(0, idx-2):idx+1]
             prod_data = {}
+            tp = by_stp  # alias local
             for p in productos:
-                v12  = sum(by_stp[sem][t][p]['ventas_u']   for sem in last12)
-                v3   = sum(by_stp[sem][t][p]['ventas_u']   for sem in last3)
-                emb3 = sum(by_stp[sem][t][p]['embarque_u'] for sem in last3)  # embarque 3 semanas
-                m3   = sum(by_stp[sem][t][p]['merma_u']    for sem in last3)  # merma 3 semanas (Cant VC Tienda)
-                cfbc3 = sum(by_stp[sem][t][p].get('venta_cfbc', 0) for sem in last3)  # Venta CFBC 3 semanas
-                retail3 = sum(by_stp[sem][t][p].get('retail_vc', 0) for sem in last3)  # Retail VC 3 semanas
-                avg  = v3 / len(last3) if last3 else 0  # Promedio = 3 semanas / 3
-                
-                # Proyección = Venta Promedio / (1 - Índice Merma %)
-                merma_ratio = m3 / emb3 if emb3 > 0 else 0  # Ratio de merma como decimal
-                proj = avg / (1 - merma_ratio) if merma_ratio < 1 else avg  # Evitar división por cero
-                
+                v12 = v3 = emb3 = m3 = cfbc3 = retail3 = 0.0
+                for sem in last12:
+                    v12 += tp[sem][t][p]['ventas_u']
+                for sem in last3:
+                    row = tp[sem][t][p]
+                    v3      += row['ventas_u']
+                    emb3    += row['embarque_u']
+                    m3      += row['merma_u']
+                    cfbc3   += row['venta_cfbc']
+                    retail3 += row['retail_vc']
+                n3  = len(last3) or 1
+                avg = v3 / n3
+                mr  = m3 / emb3 if emb3 > 0 else 0
+                proj = avg / (1 - mr) if mr < 1 else avg
                 prod_data[p] = {
                     'v12': round(v12), 'v3': round(v3),
                     'emb': round(emb3), 'm3': round(m3),
@@ -184,19 +190,20 @@ def cargar_datos(url: str = "") -> dict:
                 }
             result[t][s] = prod_data
 
-    # Totales crudos acumulados por tienda — GLOBAL (todas las fechas, sin ventanas deslizantes)
-    totales_tienda = defaultdict(lambda: defaultdict(float))
-    # Totales crudos por tienda+semana — para filtrar por semana específica
-    raw_semana = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
+    # Un solo loop para todos los totales acumulados
+    totales_tienda         = defaultdict(lambda: defaultdict(float))
+    raw_semana_tienda      = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
+    totales_producto       = defaultdict(lambda: defaultdict(float))
+    totales_tienda_producto= defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
+
     for r in records:
-        totales_tienda[r['tienda']]['embarque_u'] += r['embarque_u']
-        totales_tienda[r['tienda']]['venta_cfbc'] += r['venta_cfbc']
-        totales_tienda[r['tienda']]['merma_u']    += r['merma_u']
-        totales_tienda[r['tienda']]['retail_vc']  += r['retail_vc']
-        raw_semana[r['tienda']][r['semana']]['embarque_u'] += r['embarque_u']
-        raw_semana[r['tienda']][r['semana']]['venta_cfbc'] += r['venta_cfbc']
-        raw_semana[r['tienda']][r['semana']]['merma_u']    += r['merma_u']
-        raw_semana[r['tienda']][r['semana']]['retail_vc']  += r['retail_vc']
+        t2, s2, p2 = r['tienda'], r['semana'], r['producto']
+        for field in ('embarque_u','venta_cfbc','merma_u','retail_vc'):
+            v = r[field]
+            totales_tienda[t2][field]            += v
+            raw_semana_tienda[t2][s2][field]     += v
+            totales_producto[p2][field]          += v
+            totales_tienda_producto[t2][p2][field]+= v
 
     # ── Totales por PRODUCTO (solo 2 estructuras livianas) ─────────────────────
     # Global: todas las tiendas, todas las semanas
@@ -216,7 +223,7 @@ def cargar_datos(url: str = "") -> dict:
         'fecha_por_semana':    fecha_por_semana,
         'data':                {t: {str(s): v for s, v in sv2.items()} for t, sv2 in result.items()},
         'totales_tienda':      {t: dict(v) for t, v in totales_tienda.items()},
-        'raw_semana':          {t: {str(s): dict(v) for s, v in sv.items()} for t, sv in raw_semana.items()},
+        'raw_sem_t':           {t: {str(s): dict(v) for s, v in sv.items()} for t, sv in raw_semana_tienda.items()},
         'totales_producto':    {p: dict(v) for p, v in totales_producto.items()},
         'totales_tienda_prod': {t: {p: dict(v) for p, v in pv.items()} for t, pv in totales_tienda_producto.items()},
     }
@@ -553,7 +560,7 @@ function renderTienda(){
       var tot = (DATA.totales_tienda && DATA.totales_tienda[tienda]) || {};
       emb=tot.embarque_u||0; cfbc=tot.venta_cfbc||0; merma=tot.merma_u||0; retail=tot.retail_vc||0;
     } else {
-      var raw = ((DATA.raw_semana||{})[tienda]||{})[key] || {};
+      var raw = ((DATA.raw_sem_t||{})[tienda]||{})[key] || {};
       emb=raw.embarque_u||0; cfbc=raw.venta_cfbc||0; merma=raw.merma_u||0; retail=raw.retail_vc||0;
     }
     totEmb+=emb; totCfbc+=cfbc; totMerma+=merma; totRetail+=retail;
