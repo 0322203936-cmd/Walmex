@@ -53,6 +53,10 @@ def cargar_datos(url: str = "") -> dict:
             if h == name: return i
         raise ValueError(f'Columna "{name}" no encontrada. Encabezados: {headers}')
 
+    # Log headers para diagnóstico si alguna columna falla
+    import sys
+    _col_names = [h for h in headers if h]
+    
     idx_producto = col('Desc Art 1')
     idx_tienda   = col('Nombre Tienda/Club')
     idx_semana   = col('SEM')
@@ -61,15 +65,28 @@ def cargar_datos(url: str = "") -> dict:
     idx_embarque = col('Cntd Embarque') # Unidades embarcadas
     idx_merma_vc = col('Cant VC Tienda') # Merma (Cant VC Tienda)
     
-    # Columnas opcionales para Tienda
-    try:
-        idx_venta_cfbc = col('Venta CFBC / Costo (Facturado)')
-    except:
-        idx_venta_cfbc = None
-    try:
-        idx_retail_vc = col('Suma de Retail VC Tienda')
-    except:
-        idx_retail_vc = None
+    # Columnas opcionales para Tienda — intentar varios nombres posibles
+    idx_venta_cfbc = None
+    for _n in ['Venta CFBC / Costo (Facturado)', 'Venta CFBC/Costo (Facturado)',
+               'Venta CFBC', 'CFBC']:
+        try: idx_venta_cfbc = col(_n); break
+        except: pass
+
+    idx_retail_vc = None
+    for _n in ['Suma de Retail VC Tienda', 'Retail VC Tienda',
+               'Suma Retail VC Tienda', 'Retail VC', 'Suma de Retail VC',
+               'Suma de Retail VC Tienda ']:  # trailing space variant
+        try: idx_retail_vc = col(_n); break
+        except: pass
+
+    # Advertir si columnas clave no se encontraron
+    if idx_retail_vc is None:
+        import streamlit as _st
+        _st.warning(
+            f"⚠️ No se encontró columna 'Retail VC Tienda'. "
+            f"Columnas disponibles: {[h for h in headers if h and 'VC' in h or 'Retail' in h or 'retail' in h.lower() if h]}\n"
+            f"Todos los encabezados: {[h for h in headers if h]}"
+        )
 
     records = []
     for row in ws.iter_rows(min_row=2, values_only=True):
@@ -237,7 +254,7 @@ table.t td:first-child{text-align:left;color:#111}
 table.t tr.total td{font-weight:700;border-top:1px solid #ddd;background:#f5f5f5}
 .red{color:#c00;font-weight:600}
 .bold{font-weight:700}
-#viewTienda{overflow-y:auto;max-height:calc(100vh - 180px)}
+#viewTienda{overflow:visible}
 @media(max-width:1200px){
   .grid{grid-template-columns:1fr;gap:8px}
   .box{overflow-y:auto;max-height:500px}
