@@ -9,38 +9,51 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 st.set_page_config(page_title="Walmex · CFBC", layout="wide", initial_sidebar_state="collapsed")
-st.markdown("""<style>
-/* Eliminar TODO el padding/margin de Streamlit */
-header, footer, [data-testid='stToolbar'], [data-testid='stDecoration'],
-[data-testid='stStatusWidget'] { display:none !important; visibility:hidden !important; height:0 !important; }
-section[data-testid='stSidebar'] { display:none !important; }
+
+st.markdown("""
+<style>
+/* Eliminar padding/margin de Streamlit */
 .main .block-container {
-    padding-top: 0 !important;
-    padding-bottom: 0 !important;
-    padding-left: 0 !important;
-    padding-right: 0 !important;
+    padding: 0 !important;
     max-width: 100% !important;
     margin: 0 !important;
 }
 .main { padding: 0 !important; overflow: hidden !important; }
 .stApp { margin: 0 !important; }
-[data-testid='stAppViewContainer'] { padding: 0 !important; margin: 0 !important; }
+
+/* Ocultar barra superior, menú, sidebar y footer de Streamlit */
+[data-testid="stHeader"],
+[data-testid="stSidebar"],
+[data-testid="stToolbar"],
+[data-testid="stDecoration"],
+[data-testid="stStatusWidget"],
+#MainMenu, 
+header, 
+footer { 
+    display: none !important; 
+    visibility: hidden !important; 
+}
+
+/* Ocultar botón de Manage App y marca de agua de Streamlit Cloud */
+div[class^="viewerBadge"],
+div[class^="styles_viewerBadge"],
+.viewerBadge_container__r5tak,
+.styles_viewerBadge__CvC9N,
+a[href^="https://streamlit.io/cloud"],
+a[href="https://streamlit.io"],
+[data-testid="stBottom"],
+[data-testid="stActionButtonIcon"],
+.stActionButton { 
+    display: none !important; 
+    visibility: hidden !important; 
+}
+
+/* Reducir gaps en bloques verticales */
 [data-testid='stVerticalBlock'] { gap: 0 !important; padding: 0 !important; }
 div[data-testid='stHtml'] { padding: 0 !important; margin: 0 !important; line-height: 0 !important; }
 iframe { display: block !important; margin: 0 !important; border: none !important; }
-/* Ocultar badge Made with Streamlit */
-footer { display: none !important; visibility: hidden !important; }
-[data-testid="stBottom"] { display: none !important; visibility: hidden !important; }
-.viewerBadge_container__r5tak { display: none !important; }
-.styles_viewerBadge__CvC9N { display: none !important; }
-a[href="https://streamlit.io"] { display: none !important; }
-[data-testid="stActionButtonIcon"] { display: none !important; }
-.stActionButton { display: none !important; }
-#stDecoration { display: none !important; }
-/* Nuclear option - ocultar todo en la parte inferior */
-.st-emotion-cache-1dp5vir { display: none !important; }
-.st-emotion-cache-h4xjwg { display: none !important; }
-</style>""", unsafe_allow_html=True)
+</style>
+""", unsafe_allow_html=True)
 
 @st.cache_data(ttl=3600)
 def cargar_datos(path: str) -> dict:
