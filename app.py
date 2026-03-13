@@ -24,16 +24,39 @@ iframe{display:block!important;margin:0!important;border:none!important}
 </style>
 """, unsafe_allow_html=True)
 
+# ── URL pública de OneDrive ────────────────────────────────────────────────
+import base64 as _b64, io, requests as _req
+
+def _onedrive_direct(share_url: str) -> str:
+    encoded = _b64.b64encode(share_url.encode()).decode()
+    encoded = encoded.rstrip("=").replace("/", "_").replace("+", "-")
+    return f"https://api.onedrive.com/v1.0/shares/u!{encoded}/root/content"
+
+ONEDRIVE_URL = "https://1drv.ms/x/c/5d6a06dda16e2787/IQDWJUoxgc-6Sqr0hM6etrTAAQs-8h_4Q6znhZaqTiel6jk?e=5Fu244"
+
 # ── cache_resource: el objeto vive en memoria del proceso, sin serializar ──
 @st.cache_resource(show_spinner=False)
 def cargar_datos() -> dict:
-    paths = ["Analisis_Walmart.xlsx", "Analisis Walmart.xlsx"]
-    excel_path = next((p for p in paths if Path(p).exists()), None)
-    if not excel_path:
-        raise FileNotFoundError("No se encontró Analisis_Walmart.xlsx en el repositorio.")
+    # Intentar primero desde OneDrive, si falla buscar local
+    df = None
+    try:
+        direct_url = _onedrive_direct(ONEDRIVE_URL)
+        resp = _req.get(direct_url, timeout=30)
+        resp.raise_for_status()
+        df = pd.read_excel(io.BytesIO(resp.content), sheet_name="Data", engine="openpyxl")
+    except Exception:
+        # Fallback: archivo local (útil para desarrollo)
+        paths = ["Analisis_Walmart.xlsx", "Analisis Walmart.xlsx",
+                 "Analisis_Walmart1.xlsx", "Analisis Walmart1.xlsx"]
+        excel_path = next((p for p in paths if Path(p).exists()), None)
+        if not excel_path:
+            raise FileNotFoundError(
+                "No se pudo descargar desde OneDrive y no hay archivo local."
+            )
+        df = pd.read_excel(excel_path, sheet_name="Data", engine="openpyxl")
 
     # pandas lee el Excel 5-10x más rápido que openpyxl fila a fila
-    df = pd.read_excel(excel_path, sheet_name='Data', engine='openpyxl')
+    df = df
     df.columns = df.columns.str.strip()
 
     # Mapeo de columnas (insensible a mayúsculas)
