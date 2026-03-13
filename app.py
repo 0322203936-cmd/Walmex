@@ -2,9 +2,9 @@
 Walmex Dashboard — CFBC
 Reporte ejecutivo estilo Walmart
 """
-import json, base64, openpyxl
+import json, base64
 from pathlib import Path
-from datetime import datetime as _dt
+import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 
@@ -24,97 +24,131 @@ iframe{display:block!important;margin:0!important;border:none!important}
 </style>
 """, unsafe_allow_html=True)
 
-@st.cache_data(ttl=3600, show_spinner=False)
+# ── cache_resource: el objeto vive en memoria del proceso, sin serializar ──
+@st.cache_resource(show_spinner=False)
 def cargar_datos() -> dict:
     paths = ["Analisis_Walmart.xlsx", "Analisis Walmart.xlsx"]
     excel_path = next((p for p in paths if Path(p).exists()), None)
     if not excel_path:
         raise FileNotFoundError("No se encontró Analisis_Walmart.xlsx en el repositorio.")
-    wb = openpyxl.load_workbook(excel_path, data_only=True, read_only=True)
-    ws = wb['Data']
 
-    def sv(v):
-        try: return float(v) if v is not None else 0.0
-        except: return 0.0
+    # pandas lee el Excel 5-10x más rápido que openpyxl fila a fila
+    df = pd.read_excel(excel_path, sheet_name='Data', engine='openpyxl')
+    df.columns = df.columns.str.strip()
 
-    headers = [str(c.value).strip() if c.value else '' for c in next(ws.iter_rows(min_row=1, max_row=1))]
-    def col(name):
-        nl = name.strip().lower()
-        for i, h in enumerate(headers):
-            if h.strip().lower() == nl: return i
-        raise ValueError(f'Columna "{name}" no encontrada.')
+    # Mapeo de columnas (insensible a mayúsculas)
+    col_lower = {c.strip().lower(): c for c in df.columns}
+    needed = {
+        'producto':     'desc art 1',
+        'tienda':       'nombre tienda/club',
+        'semana':       'sem',
+        'fecha':        'diario',
+        'ventas_u':     'cnt pos',
+        'embarque_u':   'cntd embarque',
+        'merma_u':      'cant vc tienda',
+        'venta_cfbc':   'venta cfbc / costo (facturado)',
+        'retail_vc':    'retail vc tienda',
+    }
+    rename = {}
+    for new_name, lookup in needed.items():
+        found = col_lower.get(lookup)
+        if not found:
+            raise ValueError(f'Columna "{lookup}" no encontrada. Columnas disponibles: {list(df.columns)}')
+        rename[found] = new_name
+    df = df.rename(columns=rename)[list(needed.keys())]
 
-    idx_producto  = col('Desc Art 1')
-    idx_tienda    = col('Nombre Tienda/Club')
-    idx_semana    = col('SEM')
-    idx_fecha     = col('Diario')
-    idx_ventas    = col('Cnt POS')
-    idx_embarque  = col('Cntd Embarque')
-    idx_merma_vc  = col('Cant VC Tienda')
-    idx_cfbc      = col('Venta CFBC / Costo (Facturado)')
-    idx_retail    = col('Retail VC Tienda')
+    # Limpiar y convertir tipos
+    df['producto'] = df['producto'].astype(str).str.strip()
+    df['tienda']   = df['tienda'].astype(str).str.strip()
+    df['semana']   = pd.to_numeric(df['semana'], errors='coerce')
+    df['fecha']    = pd.to_datetime(df['fecha'], errors='coerce', dayfirst=False)
 
-    records = []
-    for row in ws.iter_rows(min_row=2, values_only=True):
-        producto = str(row[idx_producto]).strip() if row[idx_producto] else None
-        tienda   = str(row[idx_tienda]).strip()   if row[idx_tienda]   else None
-        try: semana_num = int(float(row[idx_semana])) if row[idx_semana] is not None else None
-        except: semana_num = None
-        if not producto or not tienda or not semana_num: continue
+    for col in ['ventas_u', 'embarque_u', 'merma_u', 'venta_cfbc', 'retail_vc']:
+        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
 
-        fecha_raw = row[idx_fecha]; anio = None
-        if hasattr(fecha_raw, 'strftime'):
-            fecha = fecha_raw.strftime('%d/%m/%Y'); anio = fecha_raw.year
-        elif fecha_raw:
-            for fmt in ('%m/%d/%Y', '%d/%m/%Y', '%Y-%m-%d'):
-                try: dt = _dt.strptime(str(fecha_raw).strip(), fmt); fecha = dt.strftime('%d/%m/%Y'); anio = dt.year; break
-                except: continue
-            else: fecha = str(fecha_raw)
-        else: fecha = ''
-        if not anio: continue
+    # Filtrar filas inválidas
+    df = df.dropna(subset=['producto', 'tienda', 'semana', 'fecha'])
+    df = df[(df['producto'] != 'None') & (df['tienda'] != 'None')]
+    df = df[df['producto'].str.len() > 0]
 
-        records.append({
-            'producto': producto, 'tienda': tienda,
-            'semana':   anio * 100 + semana_num, 'fecha': fecha,
-            'ventas_u':   sv(row[idx_ventas]),
-            'embarque_u': sv(row[idx_embarque]),
-            'merma_u':    sv(row[idx_merma_vc]),
-            'venta_cfbc': sv(row[idx_cfbc]),
-            'retail_vc':  sv(row[idx_retail]),
-        })
-    wb.close()
+    df['anio']       = df['fecha'].dt.year
+    df['semana_key'] = df['anio'] * 100 + df['semana'].astype(int)
+    df['fecha_str']  = df['fecha'].dt.strftime('%d/%m/%Y')
 
-    semanas   = sorted(set(r['semana']   for r in records))
-    tiendas   = sorted(set(r['tienda']   for r in records))
-    productos = sorted(set(r['producto'] for r in records))
+    semanas   = sorted(df['semana_key'].unique().tolist())
+    tiendas   = sorted(df['tienda'].unique().tolist())
+    productos = sorted(df['producto'].unique().tolist())
 
-    fecha_por_semana = {}; raw = {}; raw_sem_t = {}
-    totales_tienda = {}; totales_producto = {}; totales_tienda_prod = {}
+    # fecha_por_semana {str(semana_key): "dd/mm/yyyy"}
+    fecha_por_semana = (
+        df.groupby('semana_key')['fecha_str'].last()
+        .rename(index=lambda x: str(int(x)))
+        .to_dict()
+    )
 
-    for r in records:
-        t2=r['tienda']; s2=r['semana']; p2=r['producto']; sk=str(s2)
-        vu=r['ventas_u']; eu=r['embarque_u']; mu=r['merma_u']; cf=r['venta_cfbc']; rv=r['retail_vc']
+    # ── raw[sk][tienda][producto] = [vu, eu, mu, cf, rv] ──────────────────
+    AGG_COLS = ['ventas_u', 'embarque_u', 'merma_u', 'venta_cfbc', 'retail_vc']
+    agg_stp = (
+        df.groupby(['semana_key', 'tienda', 'producto'])[AGG_COLS]
+        .sum().reset_index()
+    )
+    raw = {}
+    for row in agg_stp.itertuples(index=False):
+        sk = str(int(row.semana_key))
+        d  = raw.setdefault(sk, {}).setdefault(row.tienda, {})
+        d[row.producto] = [
+            round(row.ventas_u), round(row.embarque_u),
+            round(row.merma_u),  round(row.venta_cfbc, 2),
+            round(row.retail_vc, 2),
+        ]
 
-        if r['fecha']: fecha_por_semana[s2] = r['fecha']
+    # ── raw_sem_t[tienda][sk] = {embarque_u, venta_cfbc, merma_u, retail_vc}
+    MCOLS = ['embarque_u', 'venta_cfbc', 'merma_u', 'retail_vc']
+    agg_ts = df.groupby(['tienda', 'semana_key'])[MCOLS].sum().reset_index()
+    raw_sem_t = {}
+    for row in agg_ts.itertuples(index=False):
+        sk = str(int(row.semana_key))
+        raw_sem_t.setdefault(row.tienda, {})[sk] = {
+            'embarque_u': round(row.embarque_u),
+            'venta_cfbc': round(row.venta_cfbc, 2),
+            'merma_u':    round(row.merma_u),
+            'retail_vc':  round(row.retail_vc, 2),
+        }
 
-        if sk not in raw:         raw[sk] = {}
-        if t2 not in raw[sk]:     raw[sk][t2] = {}
-        if p2 not in raw[sk][t2]: raw[sk][t2][p2] = [0,0,0,0,0]
-        x = raw[sk][t2][p2]; x[0]+=vu; x[1]+=eu; x[2]+=mu; x[3]+=cf; x[4]+=rv
+    # ── totales_tienda[tienda] ─────────────────────────────────────────────
+    agg_t = df.groupby('tienda')[MCOLS].sum()
+    totales_tienda = {
+        t: {
+            'embarque_u': round(row.embarque_u),
+            'venta_cfbc': round(row.venta_cfbc, 2),
+            'merma_u':    round(row.merma_u),
+            'retail_vc':  round(row.retail_vc, 2),
+        }
+        for t, row in agg_t.iterrows()
+    }
 
-        if t2 not in raw_sem_t:       raw_sem_t[t2] = {}
-        if sk not in raw_sem_t[t2]:   raw_sem_t[t2][sk] = {'embarque_u':0,'venta_cfbc':0,'merma_u':0,'retail_vc':0}
-        d=raw_sem_t[t2][sk]; d['embarque_u']+=eu; d['venta_cfbc']+=cf; d['merma_u']+=mu; d['retail_vc']+=rv
+    # ── totales_producto[producto] ─────────────────────────────────────────
+    agg_p = df.groupby('producto')[MCOLS].sum()
+    totales_producto = {
+        p: {
+            'embarque_u': round(row.embarque_u),
+            'venta_cfbc': round(row.venta_cfbc, 2),
+            'merma_u':    round(row.merma_u),
+            'retail_vc':  round(row.retail_vc, 2),
+        }
+        for p, row in agg_p.iterrows()
+    }
 
-        if t2 not in totales_tienda:   totales_tienda[t2] = {'embarque_u':0,'venta_cfbc':0,'merma_u':0,'retail_vc':0}
-        d=totales_tienda[t2]; d['embarque_u']+=eu; d['venta_cfbc']+=cf; d['merma_u']+=mu; d['retail_vc']+=rv
-
-        if p2 not in totales_producto: totales_producto[p2] = {'embarque_u':0,'venta_cfbc':0,'merma_u':0,'retail_vc':0}
-        d=totales_producto[p2]; d['embarque_u']+=eu; d['venta_cfbc']+=cf; d['merma_u']+=mu; d['retail_vc']+=rv
-
-        if t2 not in totales_tienda_prod:      totales_tienda_prod[t2] = {}
-        if p2 not in totales_tienda_prod[t2]:  totales_tienda_prod[t2][p2] = {'embarque_u':0,'venta_cfbc':0,'merma_u':0,'retail_vc':0}
-        d=totales_tienda_prod[t2][p2]; d['embarque_u']+=eu; d['venta_cfbc']+=cf; d['merma_u']+=mu; d['retail_vc']+=rv
+    # ── totales_tienda_prod[tienda][producto] ──────────────────────────────
+    agg_tp = df.groupby(['tienda', 'producto'])[MCOLS].sum().reset_index()
+    totales_tienda_prod = {}
+    for row in agg_tp.itertuples(index=False):
+        totales_tienda_prod.setdefault(row.tienda, {})[row.producto] = {
+            'embarque_u': round(row.embarque_u),
+            'venta_cfbc': round(row.venta_cfbc, 2),
+            'merma_u':    round(row.merma_u),
+            'retail_vc':  round(row.retail_vc, 2),
+        }
 
     return {
         'semanas':             semanas,
@@ -133,6 +167,7 @@ try:
 except Exception as e:
     st.error(f"❌ Error cargando datos: {e}")
     st.stop()
+
 
 HTML = r"""<!DOCTYPE html>
 <html lang="es">
@@ -283,41 +318,30 @@ var MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','
 
 function fmt(v){ return Math.round(v||0).toLocaleString('es-MX'); }
 
-function showErr(msg){
-  document.getElementById('loader').style.display='none';
-  document.body.style.background='#fff';
-  document.body.innerHTML='<div style="padding:30px;font-family:Arial;color:#c00;font-size:14px">'
-    +'<b>Error al cargar dashboard:</b><br><pre style="margin-top:10px;white-space:pre-wrap">'+msg+'</pre></div>';
-}
-
 function init(){
-  window.onerror = function(m,s,l,c,err){
-    showErr(m + '\nLínea: '+l+' Col: '+c+'\n'+(err&&err.stack?err.stack:''));
-    return true;
+  window.onerror = function(m,s,l){
+    document.body.innerHTML='<p style="padding:20px;color:red">Error: '+m+' (línea '+l+')</p>';
   };
-  try {
-    if(!DATA || !DATA.semanas || !DATA.semanas.length){ showErr('DATA vacío o sin semanas'); return; }
-    if(!DATA.raw){ showErr('DATA.raw no existe. Claves disponibles: '+Object.keys(DATA).join(', ')); return; }
-    var sel = document.getElementById('semSel');
-    var optAll = document.createElement('option');
-    optAll.value = 'all'; optAll.textContent = '— Todas las semanas —';
-    sel.appendChild(optAll);
-    DATA.semanas.forEach(function(s){
-      var opt = document.createElement('option');
-      opt.value = s;
-      var yr = Math.floor(s/100), wk = s%100;
-      opt.textContent = yr < 2000 ? 'Semana '+String(s).padStart(2,'0') : yr+' · Semana '+String(wk).padStart(2,'0');
-      sel.appendChild(opt);
-    });
-    state.semana = DATA.semanas[DATA.semanas.length-1];
-    sel.value    = state.semana;
-    state.tienda = DATA.tiendas[0];
-    buildChips(); updateHeader(); render();
-    document.getElementById('loader').style.display = 'none';
-    document.getElementById('app').style.display    = 'block';
-  } catch(e) {
-    showErr(e.message + '\n' + (e.stack||''));
-  }
+  var sel = document.getElementById('semSel');
+  // Opción global al inicio
+  var optAll = document.createElement('option');
+  optAll.value = 'all';
+  optAll.textContent = '— Todas las semanas —';
+  sel.appendChild(optAll);
+  DATA.semanas.forEach(function(s){
+    var opt = document.createElement('option');
+    opt.value = s;
+    var yr = Math.floor(s/100), wk = s%100;
+    opt.textContent = yr+' · Semana '+String(wk).padStart(2,'0');
+    if(yr < 2000){ opt.textContent = 'Semana '+String(s).padStart(2,'0'); }
+    sel.appendChild(opt);
+  });
+  state.semana = DATA.semanas[DATA.semanas.length-1];
+  sel.value    = state.semana;
+  state.tienda = DATA.tiendas[0];
+  buildChips(); updateHeader(); render();
+  document.getElementById('loader').style.display = 'none';
+  document.getElementById('app').style.display    = 'block';
 }
 
 function buildChips(){
@@ -695,4 +719,12 @@ def build_html():
     ).decode('ascii')
     return HTML.replace('__DATA_JSON__', data_json)
 
-components.html(build_html(), height=1600, scrolling=True)
+
+# ── HTML cacheado en sesión: no se re-codifica en cada rerun de Streamlit ──
+if 'html_content' not in st.session_state:
+    data_json = base64.b64encode(
+        json.dumps(DATA, ensure_ascii=True, default=str).encode('utf-8')
+    ).decode('ascii')
+    st.session_state.html_content = HTML.replace('__DATA_JSON__', data_json)
+
+components.html(st.session_state.html_content, height=1600, scrolling=True)
