@@ -1,2 +1,3 @@
-openpyxl
+-e openpyxl
 pandas
+requests
